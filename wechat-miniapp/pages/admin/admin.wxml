@@ -1,0 +1,51 @@
+<view class="page">
+  <view class="eyebrow">Operations</view>
+  <view class="title">Admin order dashboard</view>
+  <view class="subtitle">
+    <text class="cn">该页面已合并到“我的”。这里仅保留测试入口，可修改需求送达日期和行程日期。</text>
+    <text class="en">This page is merged into My. This legacy test page edits request delivery dates and carrier travel dates.</text>
+  </view>
+
+  <view class="notice danger-notice">
+    For production, protect this admin page with real access control. This MVP keeps it visible for testing only.
+  </view>
+
+  <view class="section-title">Submitted requests</view>
+  <block wx:if="{{requests.length}}">
+    <view class="list-item" wx:for="{{requests}}" wx:key="_id">
+      <view class="tag">Request</view>
+      <view class="item-title">{{item.itemName}}</view>
+      <view class="item-line">{{item.fromLocation}} → {{item.toLocation}}</view>
+      <view class="item-line">Budget: €{{item.budgetEur}} · Value: €{{item.estimatedValueEur}}</view>
+      <view class="item-line">China domestic shipping: {{item.chinaDomesticShipping}}</view>
+      <view class="field">
+        <text class="label">期望送达日期\nDesired delivery date</text>
+        <picker mode="date" value="{{item.desiredDeliveryDate}}" data-id="{{item._id}}" data-field="desiredDeliveryDate" bindchange="onDateChange">
+          <view class="picker compact-picker">{{item.desiredDeliveryDate || "Select / 选择"}}</view>
+        </picker>
+      </view>
+      <view class="item-note" wx:if="{{item.notes}}">{{item.notes}}</view>
+    </view>
+  </block>
+  <view class="card muted" wx:else>No requests submitted yet.</view>
+
+  <view class="section-title">Carrier submissions</view>
+  <block wx:if="{{carriers.length}}">
+    <view class="list-item" wx:for="{{carriers}}" wx:key="_id">
+      <view class="tag">Carrier</view>
+      <view class="item-title">{{item.travelRoute}}</view>
+      <view class="item-line">{{item.name}} · {{item.contact}}</view>
+      <view class="item-line">Travel date: {{item.travelDate}}</view>
+      <view class="item-line">Space: {{item.availableLuggageSpace}}</view>
+      <view class="item-line">Expected reward: {{item.expectedReward}}</view>
+      <view class="field">
+        <text class="label">旅行日期\nTravel date</text>
+        <picker mode="date" value="{{item.travelDate}}" data-id="{{item._id}}" data-field="travelDate" bindchange="onDateChange">
+          <view class="picker compact-picker">{{item.travelDate || "Select / 选择"}}</view>
+        </picker>
+      </view>
+      <view class="item-note" wx:if="{{item.notes}}">{{item.notes}}</view>
+    </view>
+  </block>
+  <view class="card muted" wx:else>No carriers submitted yet.</view>
+</view>

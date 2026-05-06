@@ -1,0 +1,51 @@
+<view class="page">
+  <view class="eyebrow">
+    <text class="cn">学生注册</text>
+    <text class="en">Student registration</text>
+  </view>
+  <view class="title">注册</view>
+  <view class="subtitle">
+    <text class="cn">创建基础 MVP 资料。请不要填写护照号码、身份证号码、签证信息或上传证件。</text>
+    <text class="en">Create a basic MVP profile. Do not enter passport numbers, national ID numbers, visa details, or document uploads.</text>
+  </view>
+
+  <form bindsubmit="submitForm">
+    <view class="card">
+      <view class="field">
+        <text class="label">姓名全称\nFull name</text>
+        <input class="input" name="fullName" placeholder="Full name / 姓名" />
+      </view>
+      <view class="field">
+        <text class="label">邮箱\nEmail</text>
+        <input class="input" name="email" type="text" placeholder="name@example.com" />
+      </view>
+      <view class="field">
+        <text class="label">微信 / WhatsApp\nWeChat / WhatsApp</text>
+        <input class="input" name="messagingContact" placeholder="WeChat or WhatsApp" />
+      </view>
+      <view class="field">
+        <text class="label">城市\nCity</text>
+        <input class="input" name="city" placeholder="Paris / 巴黎" />
+      </view>
+      <view class="field">
+        <text class="label">学校或大学\nSchool or university</text>
+        <input class="input" name="schoolOrUniversity" placeholder="University name / 学校名称" />
+      </view>
+      <view class="field">
+        <text class="label">是否愿意后续完成身份验证？\nWilling to complete identity verification later?</text>
+        <picker value="{{verificationIndex}}" range="{{verificationOptions}}" bindchange="onVerificationChange">
+          <view class="picker">{{verificationOptions[verificationIndex]}}</view>
+        </picker>
+      </view>
+    </view>
+
+    <view class="notice">
+      <text class="cn">MVP 阶段不收集护照号码或身份证件。</text>
+      <text class="en">We do not collect passport numbers or ID documents at MVP stage.</text>
+      <text class="cn">后续身份验证可能通过可信第三方服务完成。</text>
+      <text class="en">Identity verification may be introduced later through a trusted third-party provider.</text>
+    </view>
+
+    <button class="primary-button submit-button" form-type="submit">提交注册 / Submit registration</button>
+  </form>
+</view>

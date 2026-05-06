@@ -1,0 +1,74 @@
+<view class="page">
+  <view class="eyebrow">
+    <text class="cn">发布需求</text>
+    <text class="en">Request</text>
+  </view>
+  <view class="title">帮我带</view>
+  <view class="subtitle">
+    <text class="cn">填写路线、物品信息和预算。请不要填写护照、身份证、签证或其他证件信息。</text>
+    <text class="en">Share route, item details, and budget. Do not enter passport, national ID, visa, or identity document details.</text>
+  </view>
+
+  <form bindsubmit="submitForm">
+    <view class="card">
+      <view class="field">
+        <text class="label">姓名\nName</text>
+        <input class="input" name="name" placeholder="张三 / Alex" />
+      </view>
+      <view class="field">
+        <text class="label">联系方式\nWeChat / WhatsApp / Email</text>
+        <input class="input" name="contact" placeholder="WeChat, WhatsApp or email" />
+      </view>
+      <view class="field">
+        <text class="label">出发城市/国家\nFrom city/country</text>
+        <input class="input" name="fromLocation" placeholder="Shanghai, China" />
+      </view>
+      <view class="field">
+        <text class="label">到达城市/国家\nTo city/country</text>
+        <input class="input" name="toLocation" placeholder="Paris, France" />
+      </view>
+      <view class="field">
+        <text class="label">物品名称\nItem name</text>
+        <input class="input" name="itemName" placeholder="课本 / Textbook" />
+      </view>
+      <view class="field">
+        <text class="label">预估价值 EUR\nEstimated value in EUR</text>
+        <input class="input" name="estimatedValueEur" type="digit" placeholder="50" />
+      </view>
+      <view class="field">
+        <text class="label">期望送达日期\nDesired delivery date</text>
+        <picker mode="date" value="{{desiredDeliveryDate}}" bindchange="onDeliveryDateChange">
+          <view class="picker">{{desiredDeliveryDate || "Select date / 选择日期"}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <text class="label">预算 EUR\nBudget in EUR</text>
+        <input class="input" name="budgetEur" type="digit" placeholder="25" />
+      </view>
+      <view class="field">
+        <text class="label">中国国内是否可邮寄？\nDomestic shipping in China available?</text>
+        <picker value="{{shippingIndex}}" range="{{shippingOptions}}" bindchange="onShippingChange">
+          <view class="picker">{{shippingOptions[shippingIndex]}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <text class="label">备注\nNotes</text>
+        <textarea class="textarea" name="notes" placeholder="尺寸、时间、交接方式 / Size, timing, handoff details" />
+      </view>
+    </view>
+
+    <view class="notice">
+      <text class="cn">MVP 阶段不收集护照号码或身份证件。</text>
+      <text class="en">We do not collect passport numbers or ID documents at MVP stage.</text>
+      <text class="cn">后续身份验证可能通过可信第三方服务完成。</text>
+      <text class="en">Identity verification may be introduced later through a trusted third-party provider.</text>
+    </view>
+
+    <label class="checkbox-row">
+      <checkbox value="confirmed" checked="{{confirmed}}" bindtap="toggleConfirmed" />
+      <text>我确认该物品不是限制、违法、奢侈、高价值或身份证件类物品。\nI confirm this is not a restricted, illegal, luxury, high-value, or identity document item.</text>
+    </label>
+
+    <button class="primary-button submit-button" form-type="submit">提交并支付 / Submit and pay</button>
+  </form>
+</view>

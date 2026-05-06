@@ -1,0 +1,39 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/market/market",
+    "pages/my/my",
+    "pages/post-request/post-request",
+    "pages/carry-earn/carry-earn",
+    "pages/register/register",
+    "pages/admin/admin"
+  ],
+  "window": {
+    "navigationBarTitleText": "Student Carry",
+    "navigationBarBackgroundColor": "#050918",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#050918"
+  },
+  "tabBar": {
+    "color": "#aeb6d9",
+    "selectedColor": "#ffffff",
+    "backgroundColor": "#141827",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "Home"
+      },
+      {
+        "pagePath": "pages/market/market",
+        "text": "Market"
+      },
+      {
+        "pagePath": "pages/my/my",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

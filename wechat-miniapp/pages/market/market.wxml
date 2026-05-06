@@ -1,0 +1,40 @@
+<view class="page">
+  <view class="hero">
+    <view class="eyebrow">Market</view>
+    <view class="title">匹配集市</view>
+    <view class="subtitle">
+      <text class="cn">选择你想要查看的类型</text>
+      <text class="en">Choose the type you want to view</text>
+    </view>
+    <view class="market-actions">
+      <button class="{{activeType === 'request' ? 'primary-button market-button' : 'secondary-button market-button'}}" data-type="request" bindtap="setType">帮我带</button>
+      <button class="{{activeType === 'carrier' ? 'primary-button market-button' : 'secondary-button market-button'}}" data-type="carrier" bindtap="setType">顺路送</button>
+    </view>
+  </view>
+
+  <view class="grid-list" wx:if="{{activeType === 'request'}}">
+    <view class="mini-card" wx:for="{{requests}}" wx:key="_id">
+      <view class="mini-route">{{item.fromLocation}} → {{item.toLocation}}</view>
+      <view class="mini-main">{{item.itemName}}</view>
+      <view class="mini-line">{{item.desiredDeliveryDate}}</view>
+      <view class="mini-price">€{{item.budgetEur}}</view>
+    </view>
+  </view>
+  <view class="card muted" wx:if="{{activeType === 'request' && !requests.length}}">
+    暂无帮我带发布
+    <text class="en">No request posts yet.</text>
+  </view>
+
+  <view class="grid-list" wx:if="{{activeType === 'carrier'}}">
+    <view class="mini-card" wx:for="{{carriers}}" wx:key="_id">
+      <view class="mini-route">{{item.travelRoute}}</view>
+      <view class="mini-main">{{item.availableLuggageSpace}}</view>
+      <view class="mini-line">{{item.travelDate}}</view>
+      <view class="mini-price">{{item.expectedReward}}</view>
+    </view>
+  </view>
+  <view class="card muted" wx:if="{{activeType === 'carrier' && !carriers.length}}">
+    暂无顺路送发布
+    <text class="en">No carry posts yet.</text>
+  </view>
+</view>

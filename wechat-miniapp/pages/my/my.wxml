@@ -1,0 +1,85 @@
+<view class="page">
+  <view class="hero">
+    <view class="eyebrow">
+      <text class="cn">我的</text>
+      <text class="en">My account</text>
+    </view>
+    <view class="title">我的</view>
+    <view class="subtitle">
+      <text class="cn">注册、登录，并管理你发布的帮我带和顺路送。</text>
+      <text class="en">Register, log in, and manage your own request or carry posts.</text>
+    </view>
+  </view>
+
+  <block wx:if="{{!loggedIn}}">
+    <view class="card">
+      <view class="button-row">
+        <button class="primary-button" bindtap="goRegister">注册 / Register</button>
+        <button class="secondary-button" bindtap="loginDemo">Log in / 登录</button>
+      </view>
+
+      <view class="section-title">登录方式</view>
+      <view class="muted">Login methods</view>
+      <view class="login-grid">
+        <button class="login-button" bindtap="loginDemo">邮箱登录\nEmail</button>
+        <button class="login-button" bindtap="loginDemo">Google 登录\nGoogle</button>
+        <button class="login-button" bindtap="loginDemo">微信登录\nWeChat</button>
+        <button class="login-button" bindtap="loginDemo">Apple ID 登录\nApple ID</button>
+        <button class="login-button" bindtap="loginDemo">支付宝登录\nAlipay</button>
+      </view>
+    </view>
+
+    <view class="notice">
+      <text class="cn">当前是 MVP 演示登录。正式版本需要接入真实账号系统和权限控制。</text>
+      <text class="en">This is MVP demo login. Production needs real authentication and access control.</text>
+    </view>
+  </block>
+
+  <block wx:else>
+    <view class="card">
+      <view class="row-link">
+        <view>
+          <view class="row-title">已登录</view>
+          <view class="row-subtitle">Logged in</view>
+        </view>
+        <button class="ghost-button small-button" bindtap="logout">退出 / Log out</button>
+      </view>
+    </view>
+
+    <view class="section-title">我的帮我带</view>
+    <view class="muted">My requests</view>
+    <block wx:if="{{requests.length}}">
+      <view class="list-item" wx:for="{{requests}}" wx:key="_id">
+        <view class="tag">Request / 帮我带</view>
+        <view class="item-title">{{item.itemName}}</view>
+        <view class="item-line">{{item.fromLocation}} → {{item.toLocation}}</view>
+        <view class="item-line">Budget / 预算: €{{item.budgetEur}}</view>
+        <view class="field">
+          <text class="label">期望送达日期\nDesired delivery date</text>
+          <picker mode="date" value="{{item.desiredDeliveryDate}}" data-id="{{item._id}}" data-field="desiredDeliveryDate" bindchange="onDateChange">
+            <view class="picker compact-picker">{{item.desiredDeliveryDate || "Select / 选择"}}</view>
+          </picker>
+        </view>
+      </view>
+    </block>
+    <view class="card muted" wx:else>暂无帮我带发布\nNo request posts yet.</view>
+
+    <view class="section-title">我的顺路送</view>
+    <view class="muted">My carry posts</view>
+    <block wx:if="{{carriers.length}}">
+      <view class="list-item" wx:for="{{carriers}}" wx:key="_id">
+        <view class="tag">Carry / 顺路送</view>
+        <view class="item-title">{{item.travelRoute}}</view>
+        <view class="item-line">Space / 空间: {{item.availableLuggageSpace}}</view>
+        <view class="item-line">Reward / 报酬: {{item.expectedReward}}</view>
+        <view class="field">
+          <text class="label">旅行日期\nTravel date</text>
+          <picker mode="date" value="{{item.travelDate}}" data-id="{{item._id}}" data-field="travelDate" bindchange="onDateChange">
+            <view class="picker compact-picker">{{item.travelDate || "Select / 选择"}}</view>
+          </picker>
+        </view>
+      </view>
+    </block>
+    <view class="card muted" wx:else>暂无顺路送发布\nNo carry posts yet.</view>
+  </block>
+</view>

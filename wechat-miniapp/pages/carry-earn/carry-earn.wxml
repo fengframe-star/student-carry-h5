@@ -1,0 +1,60 @@
+<view class="page">
+  <view class="eyebrow">
+    <text class="cn">顺路送</text>
+    <text class="en">Carry</text>
+  </view>
+  <view class="title">顺路送</view>
+  <view class="subtitle">
+    <text class="cn">填写你的路线和可用行李空间，方便后续匹配合适需求。</text>
+    <text class="en">Add your route and available space so admins can match you with a suitable request.</text>
+  </view>
+
+  <form bindsubmit="submitForm">
+    <view class="card">
+      <view class="field">
+        <text class="label">姓名\nName</text>
+        <input class="input" name="name" placeholder="张三 / Alex" />
+      </view>
+      <view class="field">
+        <text class="label">联系方式\nContact</text>
+        <input class="input" name="contact" placeholder="WeChat / WhatsApp / Email" />
+      </view>
+      <view class="field">
+        <text class="label">旅行路线\nTravel route</text>
+        <input class="input" name="travelRoute" placeholder="Shanghai → Paris" />
+      </view>
+      <view class="field">
+        <text class="label">旅行日期\nTravel date</text>
+        <picker mode="date" value="{{travelDate}}" bindchange="onTravelDateChange">
+          <view class="picker">{{travelDate || "Select date / 选择日期"}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <text class="label">可用行李空间\nAvailable luggage space</text>
+        <input class="input" name="availableLuggageSpace" placeholder="3 kg / shoebox size" />
+      </view>
+      <view class="field">
+        <text class="label">期望报酬\nExpected reward</text>
+        <input class="input" name="expectedReward" placeholder="EUR 20-35" />
+      </view>
+      <view class="field">
+        <text class="label">备注\nNotes</text>
+        <textarea class="textarea" name="notes" placeholder="交接偏好或时间 / Handoff preferences or timing" />
+      </view>
+    </view>
+
+    <view class="notice">
+      <text class="cn">MVP 阶段不收集护照号码或身份证件。</text>
+      <text class="en">We do not collect passport numbers or ID documents at MVP stage.</text>
+      <text class="cn">后续身份验证可能通过可信第三方服务完成。</text>
+      <text class="en">Identity verification may be introduced later through a trusted third-party provider.</text>
+    </view>
+
+    <label class="checkbox-row">
+      <checkbox value="agreed" checked="{{agreed}}" bindtap="toggleAgreed" />
+      <text>我同意遵守平台规则，并了解后续可能需要押金。\nI agree to follow platform rules and may be asked for a deposit.</text>
+    </label>
+
+    <button class="primary-button submit-button" form-type="submit">提交行程 / Submit travel details</button>
+  </form>
+</view>
