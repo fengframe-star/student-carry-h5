@@ -1,4 +1,6 @@
 <view class="page">
+  <button class="back-button" bindtap="goBack">← 返回 / Back</button>
+
   <view class="eyebrow">
     <text class="cn">顺路送</text>
     <text class="en">Carry</text>
@@ -15,13 +17,33 @@
         <text class="label">姓名\nName</text>
         <input class="input" name="name" placeholder="张三 / Alex" />
       </view>
-      <view class="field">
-        <text class="label">联系方式\nContact</text>
-        <input class="input" name="contact" placeholder="WeChat / WhatsApp / Email" />
+      <view class="notice compact-notice">
+        <text class="cn">联系方式将通过平台消息系统进行沟通。</text>
+        <text class="en">Contact details will be handled through the platform messaging system.</text>
       </view>
       <view class="field">
-        <text class="label">旅行路线\nTravel route</text>
-        <input class="input" name="travelRoute" placeholder="Shanghai → Paris" />
+        <text class="label">出发国家\nFrom country</text>
+        <picker value="{{fromCountryIndex}}" range="{{countryNames}}" bindchange="onFromCountryChange">
+          <view class="picker">{{countryNames[fromCountryIndex]}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <text class="label">出发城市\nFrom city</text>
+        <picker value="{{fromCityIndex}}" range="{{fromCityOptions}}" bindchange="onFromCityChange">
+          <view class="picker">{{fromCityOptions[fromCityIndex]}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <text class="label">到达国家\nTo country</text>
+        <picker value="{{toCountryIndex}}" range="{{countryNames}}" bindchange="onToCountryChange">
+          <view class="picker">{{countryNames[toCountryIndex]}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <text class="label">到达城市\nTo city</text>
+        <picker value="{{toCityIndex}}" range="{{toCityOptions}}" bindchange="onToCityChange">
+          <view class="picker">{{toCityOptions[toCityIndex]}}</view>
+        </picker>
       </view>
       <view class="field">
         <text class="label">旅行日期\nTravel date</text>

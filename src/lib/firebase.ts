@@ -1,4 +1,5 @@
 import { initializeApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -19,3 +20,5 @@ export const isFirebaseConfigured = !missingFirebaseConfig;
 const app = isFirebaseConfigured ? initializeApp(firebaseConfig) : null;
 
 export const db = app ? getFirestore(app) : null;
+export const auth = app ? getAuth(app) : null;
+export const googleProvider = new GoogleAuthProvider();

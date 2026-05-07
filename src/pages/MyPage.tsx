@@ -1,12 +1,23 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import { Link } from "react-router-dom";
+import { auth, googleProvider } from "../lib/firebase";
 import { getSubmissions, updateSubmissionDate } from "../lib/submissions";
 import type { Submission } from "../types";
 
+interface Profile {
+  name: string;
+  email: string;
+  provider: string;
+}
+
 export default function MyPage() {
-  const [loggedIn, setLoggedIn] = useState(
-    () => window.localStorage.getItem("studentCarryLoggedIn") === "true",
-  );
+  const [profile, setProfile] = useState<Profile | null>(() => readProfile());
+  const [showLoginMethods, setShowLoginMethods] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
   const [submissions, setSubmissions] = useState<Submission[]>([]);
 
   async function loadPosts() {
@@ -14,20 +25,77 @@ export default function MyPage() {
   }
 
   useEffect(() => {
-    if (loggedIn) {
+    if (profile) {
       void loadPosts();
     }
-  }, [loggedIn]);
+  }, [profile]);
 
-  function loginDemo() {
+  function saveProfile(nextProfile: Profile) {
     window.localStorage.setItem("studentCarryLoggedIn", "true");
-    setLoggedIn(true);
+    window.localStorage.setItem("studentCarryProfile", JSON.stringify(nextProfile));
+    setProfile(nextProfile);
   }
 
   function logout() {
     window.localStorage.removeItem("studentCarryLoggedIn");
-    setLoggedIn(false);
+    window.localStorage.removeItem("studentCarryProfile");
+    setProfile(null);
     setSubmissions([]);
+    setShowLoginMethods(false);
+    setShowEmailForm(false);
+  }
+
+  async function handleEmailLogin(event: FormEvent) {
+    event.preventDefault();
+    setLoginError("");
+
+    try {
+      if (auth) {
+        let credential;
+        try {
+          credential = await signInWithEmailAndPassword(auth, email, password);
+        } catch {
+          credential = await createUserWithEmailAndPassword(auth, email, password);
+        }
+        saveProfile({
+          name: credential.user.displayName || "Student Carry User",
+          email: credential.user.email || email,
+          provider: "Email",
+        });
+      } else {
+        saveProfile({
+          name: "Student Carry User",
+          email,
+          provider: "Email demo",
+        });
+      }
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "Unable to log in.");
+    }
+  }
+
+  async function handleGmailLogin() {
+    setLoginError("");
+
+    try {
+      if (!auth) {
+        saveProfile({
+          name: "Gmail User",
+          email: "gmail-user@example.com",
+          provider: "Gmail demo",
+        });
+        return;
+      }
+
+      const credential = await signInWithPopup(auth, googleProvider);
+      saveProfile({
+        name: credential.user.displayName || "Gmail User",
+        email: credential.user.email || "",
+        provider: "Gmail",
+      });
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "Unable to log in with Gmail.");
+    }
   }
 
   async function handleDateChange(
@@ -44,65 +112,128 @@ export default function MyPage() {
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
-      <div className="rounded-[32px] border border-white/10 bg-[#1f2232]/90 p-6 shadow-2xl">
-        <p className="text-sm font-bold text-slate-300">
-          <span className="block">我的</span>
-          <span className="mt-1 block text-slate-400">My account</span>
-        </p>
-        <h1 className="mt-4 text-5xl font-black text-white">我的</h1>
-        <p className="mt-4 leading-7 text-slate-300">
-          <span className="block">注册、登录，并管理你发布的帮我带和顺路送。</span>
-          <span className="block text-slate-400">Register, log in, and manage your own request or carry posts.</span>
-        </p>
-      </div>
+      {!profile ? (
+        <div className="rounded-[32px] border border-white/10 bg-[#1f2232]/90 p-6 shadow-2xl">
+          <p className="text-sm font-bold text-slate-300">
+            <span className="block">我的</span>
+            <span className="mt-1 block text-slate-400">My</span>
+          </p>
+          <h1 className="mt-4 text-5xl font-black text-white">My</h1>
+          <p className="mt-4 leading-7 text-slate-300">
+            <span className="block">登录后查看个人资料、发布记录与交易协商入口。</span>
+            <span className="block text-slate-400">Log in to view your profile, posts, and negotiation entry points.</span>
+          </p>
+        </div>
+      ) : null}
 
-      {!loggedIn ? (
+      {!profile ? (
         <>
-          <div className="mt-5 rounded-[32px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
-            <div className="grid grid-cols-2 gap-3">
-              <Link
-                to="/register"
-                className="flex min-h-14 items-center justify-center rounded-2xl bg-[#38bdf8] px-3 text-center text-sm font-black text-white"
-              >
-                注册 / Register
-              </Link>
-              <button
-                type="button"
-                onClick={loginDemo}
-                className="min-h-14 rounded-2xl border border-white/15 bg-white/10 px-3 text-sm font-black text-white"
-              >
-                Log in / 登录
-              </button>
-            </div>
-
-            <h2 className="mt-8 text-xl font-black text-white">登录方式</h2>
-            <p className="mt-1 text-sm text-slate-400">Login methods</p>
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              {["邮箱登录\nEmail", "Google 登录\nGoogle", "微信登录\nWeChat", "Apple ID 登录\nApple ID", "支付宝登录\nAlipay"].map((label) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={loginDemo}
-                  className="min-h-20 whitespace-pre-line rounded-2xl border border-white/15 bg-white/10 px-3 text-sm font-bold leading-5 text-white"
+          <div className="fade-slide-in mt-5 overflow-hidden rounded-[32px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
+            {!showLoginMethods ? (
+              <div className="stagger-in grid grid-cols-2 gap-3">
+                <Link
+                  to="/register"
+                  className="pressable flex min-h-14 items-center justify-center rounded-2xl bg-[#38bdf8] px-3 text-center text-sm font-black text-white"
                 >
-                  {label}
+                  注册 / Register
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setShowLoginMethods(true)}
+                  className="pressable min-h-14 rounded-2xl border border-white/15 bg-white/10 px-3 text-sm font-black text-white"
+                >
+                  Log in / 登录
                 </button>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div className="slide-panel-in">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowLoginMethods(false);
+                    setShowEmailForm(false);
+                  }}
+                  className="pressable mb-5 rounded-2xl border border-white/15 bg-white/10 px-4 py-2 text-xs font-bold text-slate-300"
+                >
+                  ← 返回 / Back
+                </button>
+                <h2 className="text-xl font-black text-white">登录方式</h2>
+                <p className="mt-1 text-sm text-slate-400">Login methods</p>
+                {!showEmailForm ? (
+                  <div className="stagger-in mt-5 grid gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowEmailForm(true)}
+                      className="pressable min-h-14 rounded-2xl border border-white/15 bg-white/10 px-3 text-sm font-black text-white"
+                    >
+                      邮箱登录 / Email
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleGmailLogin()}
+                      className="pressable min-h-14 rounded-2xl bg-[#38bdf8] px-3 text-sm font-black text-white"
+                    >
+                      Gmail 登录 / Gmail
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleEmailLogin} className="slide-panel-in mt-5 grid gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowEmailForm(false)}
+                      className="pressable w-fit rounded-2xl border border-white/15 bg-white/10 px-4 py-2 text-xs font-bold text-slate-300"
+                    >
+                      ← 返回 / Back
+                    </button>
+                    <label className="block">
+                      <span className="text-sm font-semibold text-slate-100">邮箱 / Email</span>
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        className="mt-2 w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none focus:border-[#38bdf8]"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-sm font-semibold text-slate-100">密码 / Password</span>
+                      <input
+                        type="password"
+                        required
+                        minLength={6}
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        className="mt-2 w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none focus:border-[#38bdf8]"
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      className="pressable min-h-14 rounded-2xl bg-[#38bdf8] px-3 text-sm font-black text-white"
+                    >
+                      登录 / Continue
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="mt-5 rounded-[28px] border border-sky-400/25 bg-sky-400/10 p-5 text-sm leading-7 text-sky-50">
-            <span className="block">当前是 MVP 演示登录。正式版本需要接入真实账号系统和权限控制。</span>
-            <span className="block text-sky-100/80">This is MVP demo login. Production needs real authentication and access control.</span>
-          </div>
+          {loginError && (
+            <div className="mt-5 rounded-[28px] border border-red-400/25 bg-red-400/10 p-5 text-sm leading-7 text-red-50">
+              {loginError}
+            </div>
+          )}
         </>
       ) : (
         <>
           <div className="mt-5 rounded-[32px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-lg font-black text-white">已登录</p>
-                <p className="mt-1 text-sm text-slate-400">Logged in</p>
+                <p className="text-xl font-black text-white">{profile.name}</p>
+                <p className="mt-1 text-sm text-slate-400">{profile.email || "No email connected"}</p>
+                <p className="mt-3 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-slate-300">
+                  {profile.provider}
+                </p>
               </div>
               <button
                 type="button"
@@ -169,6 +300,15 @@ export default function MyPage() {
       )}
     </section>
   );
+}
+
+function readProfile(): Profile | null {
+  try {
+    const raw = window.localStorage.getItem("studentCarryProfile");
+    return raw ? (JSON.parse(raw) as Profile) : null;
+  } catch {
+    return null;
+  }
 }
 
 function PostSection({

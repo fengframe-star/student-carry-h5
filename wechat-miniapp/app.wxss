@@ -139,6 +139,22 @@ page {
   border: 1rpx solid rgba(255, 255, 255, 0.12);
 }
 
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64rpx;
+  box-sizing: border-box;
+  margin-bottom: 22rpx;
+  padding: 0 24rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.14);
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, 0.08);
+  color: #eef1ff;
+  font-size: 24rpx;
+  font-weight: 800;
+}
+
 .field {
   margin-top: 24rpx;
 }
@@ -207,6 +223,11 @@ picker {
   color: #dfe3ff;
   font-size: 26rpx;
   line-height: 1.6;
+}
+
+.compact-notice {
+  padding: 18rpx;
+  font-size: 24rpx;
 }
 
 .danger-notice {

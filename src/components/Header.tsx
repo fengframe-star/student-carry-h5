@@ -1,10 +1,11 @@
 import { Link, NavLink } from "react-router-dom";
-import { PackageCheck } from "lucide-react";
+import { MessageCircle, PackageCheck } from "lucide-react";
 
 const navItems = [
   { to: "/", label: "Home" },
   { to: "/market", label: "Market" },
-  { to: "/my", label: "我的" },
+  { to: "/messages", label: "Message" },
+  { to: "/my", label: "My" },
 ];
 
 export default function Header() {
@@ -16,6 +17,13 @@ export default function Header() {
             <PackageCheck size={20} aria-hidden="true" />
           </span>
           <span>Student Carry</span>
+        </Link>
+        <Link
+          to="/messages"
+          className="ml-auto flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300 sm:hidden"
+          aria-label="Message"
+        >
+          <MessageCircle size={19} aria-hidden="true" />
         </Link>
         <nav className="hidden flex-wrap items-center justify-end gap-1 text-sm sm:flex">
           {navItems.map((item) => (

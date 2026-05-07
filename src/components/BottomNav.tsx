@@ -1,16 +1,17 @@
-import { Home, Store, UserRound } from "lucide-react";
+import { Home, MessageCircle, Store, UserRound } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const items = [
   { to: "/", label: "Home", icon: Home },
   { to: "/market", label: "Market", icon: Store },
-  { to: "/my", label: "我的", icon: UserRound },
+  { to: "/messages", label: "Message", icon: MessageCircle },
+  { to: "/my", label: "My", icon: UserRound },
 ];
 
 export default function BottomNav() {
   return (
     <nav className="fixed inset-x-4 bottom-4 z-30 rounded-[28px] border border-white/10 bg-[#141827]/95 p-2 shadow-2xl backdrop-blur sm:hidden">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-4 gap-1">
         {items.map((item) => {
           const Icon = item.icon;
           return (

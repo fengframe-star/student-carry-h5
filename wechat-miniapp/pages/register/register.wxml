@@ -1,4 +1,6 @@
 <view class="page">
+  <button class="back-button" bindtap="goBack">← 返回 / Back</button>
+
   <view class="eyebrow">
     <text class="cn">学生注册</text>
     <text class="en">Student registration</text>

@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import BackButton from "../components/BackButton";
 import FormField from "../components/FormField";
 import Notice from "../components/Notice";
 import { createRegistrationSubmission } from "../lib/submissions";
@@ -45,6 +46,7 @@ export default function RegisterPage() {
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+      <BackButton fallback="/my" />
       <div className="mb-6">
         <p className="text-sm font-bold text-slate-300">
           <span className="block">学生注册</span>

@@ -9,6 +9,10 @@ import AdminDashboardPage from "./pages/AdminDashboardPage";
 import RegisterPage from "./pages/RegisterPage";
 import MarketPage from "./pages/MarketPage";
 import MyPage from "./pages/MyPage";
+import MessagesPage from "./pages/MessagesPage";
+import ChatDetailPage from "./pages/ChatDetailPage";
+import RequestDetailPage from "./pages/RequestDetailPage";
+import CarryDetailPage from "./pages/CarryDetailPage";
 import "./styles.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -18,6 +22,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <Route element={<App />}>
           <Route index element={<LandingPage />} />
           <Route path="market" element={<MarketPage />} />
+          <Route path="market/request/:id" element={<RequestDetailPage />} />
+          <Route path="market/carry/:id" element={<CarryDetailPage />} />
+          <Route path="messages" element={<MessagesPage />} />
+          <Route path="messages/:conversationId" element={<ChatDetailPage />} />
           <Route path="my" element={<MyPage />} />
           <Route path="post-request" element={<PostRequestPage />} />
           <Route path="carry-earn" element={<CarryEarnPage />} />

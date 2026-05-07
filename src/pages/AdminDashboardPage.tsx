@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import BackButton from "../components/BackButton";
 import Notice from "../components/Notice";
 import { isFirebaseConfigured } from "../lib/firebase";
 import { getSubmissions, updateSubmissionPublishedDate } from "../lib/submissions";
@@ -181,6 +182,7 @@ export default function AdminDashboardPage() {
 
   return (
     <section className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
+      <BackButton fallback="/my" />
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-[#9a6b00]">

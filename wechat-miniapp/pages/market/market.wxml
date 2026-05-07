@@ -12,6 +12,30 @@
     </view>
   </view>
 
+  <view class="search-card">
+    <view class="search-head">
+      <view>
+        <view class="search-title">自定义搜索</view>
+        <view class="search-subtitle">City to city</view>
+      </view>
+      <button class="clear-button" bindtap="clearSearch">清除 / Clear</button>
+    </view>
+    <view class="search-grid">
+      <picker value="{{fromCountryIndex}}" range="{{searchCountries}}" bindchange="onFromCountryChange">
+        <view class="search-picker">{{searchCountries[fromCountryIndex]}}</view>
+      </picker>
+      <picker value="{{fromCityIndex}}" range="{{fromCityOptions}}" bindchange="onFromCityChange">
+        <view class="search-picker">{{fromCityOptions[fromCityIndex]}}</view>
+      </picker>
+      <picker value="{{toCountryIndex}}" range="{{searchCountries}}" bindchange="onToCountryChange">
+        <view class="search-picker">{{searchCountries[toCountryIndex]}}</view>
+      </picker>
+      <picker value="{{toCityIndex}}" range="{{toCityOptions}}" bindchange="onToCityChange">
+        <view class="search-picker">{{toCityOptions[toCityIndex]}}</view>
+      </picker>
+    </view>
+  </view>
+
   <view class="grid-list" wx:if="{{activeType === 'request'}}">
     <view class="mini-card" wx:for="{{requests}}" wx:key="_id">
       <view class="mini-route">{{item.fromLocation}} → {{item.toLocation}}</view>

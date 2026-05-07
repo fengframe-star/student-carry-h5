@@ -1,12 +1,13 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import BackButton from "../components/BackButton";
 import FormField from "../components/FormField";
 import Notice from "../components/Notice";
 import { createCarrierSubmission } from "../lib/submissions";
 
 const initialForm = {
   name: "",
-  contact: "",
+  contact: "Platform messaging",
   travelRoute: "",
   travelDate: "",
   availableLuggageSpace: "",
@@ -44,6 +45,7 @@ export default function CarryEarnPage() {
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+      <BackButton fallback="/" />
       <div className="mb-6">
         <p className="text-sm font-bold text-slate-300">
           <span className="block">顺路送</span>
@@ -76,7 +78,10 @@ export default function CarryEarnPage() {
       <form onSubmit={handleSubmit} className="grid gap-5 rounded-[32px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl sm:p-6">
         <div className="grid gap-5 sm:grid-cols-2">
           <FormField id="name" label={"姓名\nName"} required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-          <FormField id="contact" label={"联系方式\nContact"} required placeholder="WeChat / WhatsApp / Email" value={form.contact} onChange={(event) => setForm({ ...form, contact: event.target.value })} />
+          <Notice title="联系方式 / Contact" tone="info">
+            联系方式将通过平台消息系统进行沟通。
+            Contact details will be handled through the platform messaging system.
+          </Notice>
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
           <FormField id="travelRoute" label={"旅行路线\nTravel route"} required placeholder="Shanghai → Paris" value={form.travelRoute} onChange={(event) => setForm({ ...form, travelRoute: event.target.value })} />

@@ -6,6 +6,14 @@ Page({
     verificationIndex: 0
   },
 
+  goBack() {
+    if (getCurrentPages().length > 1) {
+      wx.navigateBack();
+    } else {
+      wx.switchTab({ url: "/pages/my/my" });
+    }
+  },
+
   onVerificationChange(event) {
     this.setData({ verificationIndex: Number(event.detail.value) });
   },

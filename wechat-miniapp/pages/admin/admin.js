@@ -7,6 +7,14 @@ Page({
     carriers: []
   },
 
+  goBack() {
+    if (getCurrentPages().length > 1) {
+      wx.navigateBack();
+    } else {
+      wx.switchTab({ url: "/pages/my/my" });
+    }
+  },
+
   onShow() {
     this.loadSubmissions();
   },
