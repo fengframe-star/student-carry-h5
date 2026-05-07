@@ -81,7 +81,7 @@ export default function MessagesPage() {
         onMouseUp={(event) => handleTouchEnd(event.clientX)}
         onMouseLeave={() => setTouchStart(null)}
       >
-        <div className="relative mx-auto h-[88px] max-w-[420px]">
+        <div className="relative mx-auto h-[62px] max-w-[420px]">
           {messageCards.map((card, index) => {
             const Icon = card.icon;
             const position = (index - activeCard + messageCards.length) % messageCards.length;
@@ -98,18 +98,18 @@ export default function MessagesPage() {
             return (
               <article
                 key={card.titleEn}
-                className="how-stack-card absolute left-1/2 top-0 h-[82px] w-[68%] max-w-[280px] overflow-hidden rounded-[20px] border border-white/10 bg-[#171b2b]/95 p-2.5 shadow-xl backdrop-blur"
+                className="how-stack-card absolute left-1/2 top-0 h-[58px] w-[74%] max-w-[306px] overflow-hidden rounded-[18px] border border-white/10 bg-[#171b2b]/95 px-2.5 py-2 shadow-xl backdrop-blur"
                 style={cardStyle}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h2 className="text-xs font-black text-white">{t(card.titleEn, card.titleCn)}</h2>
+                    <h2 className="text-[0.68rem] font-black leading-none text-white">{t(card.titleEn, card.titleCn)}</h2>
                   </div>
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[#38bdf8]/15 text-[#7dd3fc] ring-1 ring-[#38bdf8]/30">
-                    <Icon size={14} strokeWidth={2.4} />
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#38bdf8]/15 text-[#7dd3fc] ring-1 ring-[#38bdf8]/30">
+                    <Icon size={12} strokeWidth={2.4} />
                   </span>
                 </div>
-                <p className="mt-1.5 line-clamp-2 text-[0.62rem] leading-4 text-slate-300">{t(card.bodyEn, card.bodyCn)}</p>
+                <p className="mt-1 line-clamp-2 text-[0.56rem] leading-3 text-slate-300">{t(card.bodyEn, card.bodyCn)}</p>
               </article>
             );
           })}
