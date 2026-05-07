@@ -1,5 +1,5 @@
 import { Home, MessageCircle, Store, UserRound } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { useLanguage } from "../lib/language";
 
 const items = [
@@ -11,6 +11,18 @@ const items = [
 
 export default function BottomNav() {
   const { t } = useLanguage();
+  const location = useLocation();
+
+  if (
+    location.pathname.startsWith("/market/request/") ||
+    location.pathname.startsWith("/market/carry/") ||
+    /^\/messages\/[^/]+/.test(location.pathname) ||
+    location.pathname === "/post-request" ||
+    location.pathname === "/carry-earn" ||
+    location.pathname === "/register"
+  ) {
+    return null;
+  }
 
   return (
     <nav className="fixed inset-x-4 bottom-4 z-30 rounded-[28px] border border-white/10 bg-[#141827]/95 p-2 shadow-2xl backdrop-blur sm:hidden">

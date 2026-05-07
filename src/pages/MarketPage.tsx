@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { reputationFor } from "../lib/matching";
+import { canOpenSubmission, isOpenStatus, publicStatusLabel } from "../lib/orderAccess";
 import { getSubmissions } from "../lib/submissions";
 import { useLanguage } from "../lib/language";
 import type { CarrierSubmission, RequestSubmission, Submission } from "../types";
@@ -52,10 +53,19 @@ export default function MarketPage() {
     void load();
   }, []);
 
-  const requests = submissions.filter(
+  const marketSubmissions = submissions.filter((submission) => submission.status !== "Completed");
+  const requests = marketSubmissions.filter(
+    (submission): submission is RequestSubmission =>
+      submission.type === "request" && isOpenStatus(submission.status),
+  );
+  const carriers = marketSubmissions.filter(
+    (submission): submission is CarrierSubmission =>
+      submission.type === "carrier" && isOpenStatus(submission.status),
+  );
+  const allRequests = marketSubmissions.filter(
     (submission): submission is RequestSubmission => submission.type === "request",
   );
-  const carriers = submissions.filter(
+  const allCarriers = marketSubmissions.filter(
     (submission): submission is CarrierSubmission => submission.type === "carrier",
   );
 
@@ -68,24 +78,27 @@ export default function MarketPage() {
     [carriers, search],
   );
 
-  const activeCount =
-    activeType === "request"
-      ? visibleRequests.length
-      : activeType === "carrier"
-        ? visibleCarriers.length
-        : visibleRequests.length + visibleCarriers.length;
   const totalCount =
     activeType === "request"
       ? requests.length
       : activeType === "carrier"
         ? carriers.length
-        : requests.length + carriers.length;
+        : marketSubmissions.length;
   const publishTo = activeType === "request" ? "/post-request" : "/carry-earn";
-  const visibleAll = [...visibleRequests, ...visibleCarriers].sort((a, b) => {
+  const visibleAll = [
+    ...allRequests.filter((item) => routeMatches(search, `${item.fromLocation} ${item.toLocation}`)),
+    ...allCarriers.filter((item) => routeMatches(search, item.travelRoute)),
+  ].sort((a, b) => {
     const first = a.createdAt?.getTime?.() ?? 0;
     const second = b.createdAt?.getTime?.() ?? 0;
     return second - first;
   });
+  const activeCount =
+    activeType === "request"
+      ? visibleRequests.length
+      : activeType === "carrier"
+        ? visibleCarriers.length
+        : visibleAll.length;
 
   return (
     <section className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
@@ -183,7 +196,7 @@ export default function MarketPage() {
 function StatusBadge({ status }: { status?: string }) {
   return (
     <span className="rounded-full bg-sky-400/15 px-2.5 py-1 text-[0.68rem] font-black text-sky-100">
-      {status || "Open"}
+      {publicStatusLabel(status)}
     </span>
   );
 }
@@ -198,8 +211,9 @@ function ReputationLine({ index }: { index: number }) {
 }
 
 function RequestCard({ item, index }: { item: RequestSubmission; index: number }) {
-  return (
-    <Link to={`/market/request/${item.id}`} className="market-card block">
+  const canOpen = canOpenSubmission(item);
+  const content = (
+    <>
       <div className="flex items-center justify-between gap-2">
         <p className="market-route">{item.fromLocation || "From"} → {item.toLocation || "To"}</p>
         <StatusBadge status={item.status} />
@@ -208,13 +222,29 @@ function RequestCard({ item, index }: { item: RequestSubmission; index: number }
       <p className="market-line">{item.itemCategory || "Others"} · {item.desiredDeliveryDate || "Date pending"}</p>
       <p className="market-price">€{item.budgetEur || 0}</p>
       <ReputationLine index={index} />
+      {!canOpen ? (
+        <p className="mt-3 rounded-2xl bg-white/[0.06] px-3 py-2 text-[0.68rem] font-bold text-slate-400">
+          {`Only transaction parties can view this matched order.`}
+        </p>
+      ) : null}
+    </>
+  );
+
+  if (!canOpen) {
+    return <div className="market-card opacity-75">{content}</div>;
+  }
+
+  return (
+    <Link to={`/market/request/${item.id}`} className="market-card block">
+      {content}
     </Link>
   );
 }
 
 function CarryCard({ item, index }: { item: CarrierSubmission; index: number }) {
-  return (
-    <Link to={`/market/carry/${item.id}`} className="market-card block">
+  const canOpen = canOpenSubmission(item);
+  const content = (
+    <>
       <div className="flex items-center justify-between gap-2">
         <p className="market-route">{item.travelRoute || "Route pending"}</p>
         <StatusBadge status={item.status} />
@@ -223,6 +253,21 @@ function CarryCard({ item, index }: { item: CarrierSubmission; index: number }) 
       <p className="market-line">{item.acceptedItemTypes?.join(", ") || "Flexible"} · {item.travelDate || "Date pending"}</p>
       <p className="market-price">{item.expectedReward || "Reward pending"}</p>
       <ReputationLine index={index} />
+      {!canOpen ? (
+        <p className="mt-3 rounded-2xl bg-white/[0.06] px-3 py-2 text-[0.68rem] font-bold text-slate-400">
+          {`Only transaction parties can view this matched order.`}
+        </p>
+      ) : null}
+    </>
+  );
+
+  if (!canOpen) {
+    return <div className="market-card opacity-75">{content}</div>;
+  }
+
+  return (
+    <Link to={`/market/carry/${item.id}`} className="market-card block">
+      {content}
     </Link>
   );
 }

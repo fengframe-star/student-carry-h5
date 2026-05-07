@@ -3,6 +3,7 @@ export const STATUSES = [
   "Negotiating",
   "Matched",
   "In Transit",
+  "Closed",
   "Completed",
   "Cancelled",
 ] as const;
@@ -31,8 +32,11 @@ export interface RequestSubmission {
   id: string;
   type: "request";
   name: string;
+  ownerNickname?: string;
   contact: string;
+  fromCountry?: string;
   fromLocation: string;
+  toCountry?: string;
   toLocation: string;
   itemName: string;
   itemCategory?: ItemCategory;
@@ -52,7 +56,12 @@ export interface CarrierSubmission {
   id: string;
   type: "carrier";
   name: string;
+  ownerNickname?: string;
   contact: string;
+  fromCountry?: string;
+  fromLocation?: string;
+  toCountry?: string;
+  toLocation?: string;
   travelRoute: string;
   travelDate: string;
   availableLuggageSpace: string;
@@ -70,11 +79,15 @@ export type Submission = RequestSubmission | CarrierSubmission;
 
 export interface RegistrationSubmission {
   id: string;
-  fullName: string;
+  firstName: string;
+  lastName: string;
+  nickname: string;
   email: string;
-  messagingContact: string;
-  city: string;
-  schoolOrUniversity: string;
+  phoneNumber?: string;
+  currentCity: string;
+  schoolOrUniversity?: string;
   verificationLater: VerificationLater;
+  studentVerification?: boolean;
+  identityVerified?: boolean;
   createdAt?: Date;
 }

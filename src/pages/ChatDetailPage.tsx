@@ -10,6 +10,8 @@ import {
   type Conversation,
 } from "../lib/conversations";
 import { useLanguage } from "../lib/language";
+import { isCompletedStatus, isMatchedStatus, publicStatusLabel } from "../lib/orderAccess";
+import { updateSubmission } from "../lib/submissions";
 
 export default function ChatDetailPage() {
   const { conversationId } = useParams();
@@ -46,7 +48,8 @@ export default function ChatDetailPage() {
     return <Navigate to="/messages" replace />;
   }
 
-  const isMatched = conversation.status === "Matched";
+  const isMatched = isMatchedStatus(conversation.status);
+  const isCompleted = isCompletedStatus(conversation.status);
   const actionLabel =
     conversation.postType === "request"
       ? t("Accept Request", "接单")
@@ -55,34 +58,60 @@ export default function ChatDetailPage() {
   return (
     <section className="mx-auto flex min-h-[calc(100vh-132px)] max-w-3xl flex-col px-4 py-6 sm:px-6 sm:py-8">
       <BackButton fallback="/messages" />
-      <div className="sticky top-0 z-10 rounded-[28px] border border-sky-300/20 bg-[#1f2232]/95 p-4 shadow-2xl backdrop-blur">
+      <div className="sticky top-0 z-10 rounded-[28px] border border-sky-300/20 bg-[#1f2232]/95 p-3 shadow-2xl backdrop-blur">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold text-slate-400">{t("Transaction", "交易")}</p>
-            <h1 className="mt-1 text-xl font-black text-white">{conversation.item}</h1>
-            <p className="mt-2 text-sm font-semibold text-slate-300">{conversation.route}</p>
+            <p className="mt-1 text-sm font-semibold text-slate-300">{conversation.route}</p>
           </div>
           <span className="rounded-full bg-sky-400/15 px-3 py-1 text-xs font-black text-sky-100">
-            {conversation.status}
+            {publicStatusLabel(conversation.status)}
           </span>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-slate-300 sm:grid-cols-4">
-          <span className="rounded-2xl bg-white/[0.06] px-3 py-2">{t("Item", "物品")}: {conversation.item}</span>
-          <span className="rounded-2xl bg-white/[0.06] px-3 py-2">{t("Reward", "报酬")}: {conversation.reward}</span>
-          <span className="rounded-2xl bg-white/[0.06] px-3 py-2">{t("Location", "地点")}: TBD</span>
-          <span className="rounded-2xl bg-white/[0.06] px-3 py-2">{t("Time", "时间")}: TBD</span>
+        <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-300 sm:grid-cols-4">
+          <span className="rounded-2xl bg-white/[0.06] px-3 py-1.5">{t("Item", "物品")}: {conversation.item}</span>
+          <span className="rounded-2xl bg-white/[0.06] px-3 py-1.5">{t("Reward", "报酬")}: {conversation.reward}</span>
+          <span className="rounded-2xl bg-white/[0.06] px-3 py-1.5">{t("Location", "地点")}: TBD</span>
+          <span className="rounded-2xl bg-white/[0.06] px-3 py-1.5">{t("Time", "时间")}: TBD</span>
         </div>
         <button
           type="button"
-          disabled={isMatched}
-          onClick={() => setConversation(updateConversationStatus(conversation.id, "Matched"))}
-          className="pressable mt-4 w-full rounded-2xl bg-[#38bdf8] px-4 py-3 text-sm font-black text-white disabled:bg-white/10 disabled:text-slate-400"
+          disabled={isMatched || isCompleted}
+          onClick={() => {
+            setConversation(updateConversationStatus(conversation.id, "Matched"));
+            void updateSubmission(conversation.postId, { status: "Matched" });
+          }}
+          className="pressable mt-2 w-full rounded-xl bg-[#38bdf8] px-4 py-2 text-sm font-black text-white disabled:bg-white/10 disabled:text-slate-400"
         >
-          {isMatched ? t("Matched", "已匹配") : actionLabel}
+          {isCompleted ? t("Completed", "已完成") : isMatched ? t("Matched", "已匹配") : actionLabel}
         </button>
+        {isMatched && !isCompleted ? (
+          <button
+            type="button"
+            onClick={() => {
+              setConversation(updateConversationStatus(conversation.id, "Completed"));
+              void updateSubmission(conversation.postId, { status: "Completed" });
+            }}
+            className="pressable mt-2 w-full rounded-xl bg-emerald-400/15 px-4 py-2 text-sm font-black text-emerald-100 ring-1 ring-emerald-300/20"
+          >
+            完成交易 / Complete Transaction
+          </button>
+        ) : null}
+        {isMatched && !isCompleted ? (
+          <button
+            type="button"
+            onClick={() => {
+              setConversation(updateConversationStatus(conversation.id, "Negotiating"));
+              void updateSubmission(conversation.postId, { status: "Open" });
+            }}
+            className="pressable mt-2 w-full rounded-xl border border-red-300/25 bg-red-500/10 px-4 py-2 text-sm font-black text-red-100"
+          >
+            取消匹配 / Cancel Match
+          </button>
+        ) : null}
       </div>
 
-      <div className="flex-1 space-y-4 py-6">
+      <div className="flex-1 space-y-4 pb-28 pt-6">
         {conversation.messages.map((message, index) => {
           const isMe = message.author === "Me";
 
@@ -113,7 +142,7 @@ export default function ChatDetailPage() {
 
       <form
         onSubmit={handleSend}
-        className="sticky bottom-20 flex gap-2 rounded-[24px] border border-white/10 bg-[#1f2232]/95 p-2 shadow-2xl backdrop-blur sm:bottom-4"
+        className="fixed inset-x-4 bottom-4 z-30 mx-auto flex max-w-3xl gap-2 rounded-[24px] border border-white/10 bg-[#1f2232]/95 p-2 shadow-2xl backdrop-blur sm:bottom-6"
       >
         <input
           value={draft}

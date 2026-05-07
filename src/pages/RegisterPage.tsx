@@ -9,12 +9,15 @@ import type { VerificationLater } from "../types";
 const verificationOptions: VerificationLater[] = ["Yes / 是", "No / 否"];
 
 const initialForm = {
-  fullName: "",
+  firstName: "",
+  lastName: "",
+  nickname: "",
   email: "",
-  messagingContact: "",
-  city: "",
+  phoneNumber: "",
+  currentCity: "",
   schoolOrUniversity: "",
   verificationLater: "Yes / 是" as VerificationLater,
+  identityVerified: false,
 };
 
 export default function RegisterPage() {
@@ -30,6 +33,11 @@ export default function RegisterPage() {
 
     try {
       await createRegistrationSubmission(form);
+      window.localStorage.setItem("studentCarryProfile", JSON.stringify({
+        ...form,
+        provider: "Registration",
+        studentVerification: Boolean(form.schoolOrUniversity),
+      }));
       setForm(initialForm);
       setState("success");
       window.localStorage.setItem("studentCarryLoggedIn", "true");
@@ -45,17 +53,13 @@ export default function RegisterPage() {
   }
 
   return (
-    <section className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+    <section className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
       <BackButton fallback="/my" />
-      <div className="mb-6">
-        <p className="text-sm font-bold text-slate-300">
-          <span className="block">学生注册</span>
-          <span className="mt-1 block text-slate-400">Student registration</span>
-        </p>
-        <h1 className="mt-3 text-5xl font-black text-white">注册</h1>
-        <p className="mt-4 leading-7 text-slate-300">
-          <span className="block">创建基础 MVP 资料。请不要填写护照号码、身份证号码、签证信息或上传证件。</span>
-          <span className="block text-slate-400">Create a basic MVP profile. Do not enter passport numbers, national ID numbers, visa details, or document uploads.</span>
+      <div className="mb-5 rounded-[26px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
+        <p className="text-xs font-bold text-slate-400">Student registration</p>
+        <h1 className="mt-2 text-3xl font-black text-white">Register</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-300">
+          Create your basic profile. Identity verification is optional in this mock flow.
         </p>
       </div>
 
@@ -78,14 +82,23 @@ export default function RegisterPage() {
 
       <form onSubmit={handleSubmit} className="grid gap-5 rounded-[32px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl sm:p-6">
         <div className="grid gap-5 sm:grid-cols-2">
-          <FormField id="fullName" label={"姓名全称\nFull name"} required value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} />
+          <FormField id="firstName" label={"First name\n名"} required value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} />
+          <FormField id="lastName" label={"Last name\n姓"} required value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} />
+        </div>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <FormField id="nickname" label={"Nickname\n昵称"} required value={form.nickname} onChange={(event) => setForm({ ...form, nickname: event.target.value })} />
           <FormField id="email" label={"邮箱\nEmail"} type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
-          <FormField id="messagingContact" label={"微信 / WhatsApp\nWeChat / WhatsApp"} required value={form.messagingContact} onChange={(event) => setForm({ ...form, messagingContact: event.target.value })} />
-          <FormField id="city" label={"城市\nCity"} required value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} />
+          <FormField id="phoneNumber" label={"Phone number\n手机号"} value={form.phoneNumber} onChange={(event) => setForm({ ...form, phoneNumber: event.target.value })} />
+          <FormField id="currentCity" label={"Current city\n当前城市"} required value={form.currentCity} onChange={(event) => setForm({ ...form, currentCity: event.target.value })} />
         </div>
-        <FormField id="schoolOrUniversity" label={"学校或大学\nSchool or university"} required value={form.schoolOrUniversity} onChange={(event) => setForm({ ...form, schoolOrUniversity: event.target.value })} />
+        <FormField id="schoolOrUniversity" label={"School or university optional\n学校或大学（选填）"} value={form.schoolOrUniversity} onChange={(event) => setForm({ ...form, schoolOrUniversity: event.target.value })} />
+        {form.schoolOrUniversity ? (
+          <p className="rounded-2xl bg-sky-400/15 px-4 py-3 text-sm font-black text-sky-100">
+            Student verification option available / 可进行学生认证
+          </p>
+        ) : null}
         <label htmlFor="verificationLater" className="block">
           <span className="whitespace-pre-line text-sm font-semibold leading-6 text-slate-100">
             是否愿意后续完成身份验证？{"\n"}Willing to complete identity verification later?
@@ -107,6 +120,15 @@ export default function RegisterPage() {
               </option>
             ))}
           </select>
+        </label>
+        <label className="flex gap-3 rounded-[24px] bg-sky-400/10 p-4 text-sm leading-6 text-slate-200">
+          <input
+            type="checkbox"
+            checked={form.identityVerified}
+            onChange={(event) => setForm({ ...form, identityVerified: event.target.checked })}
+            className="mt-1 h-4 w-4 rounded border-white/20 bg-white/10 text-[#38bdf8] focus:ring-[#38bdf8]"
+          />
+          <span>Mock complete real-name visa verification / 模拟完成实名签证认证</span>
         </label>
         <Notice title="隐私说明 / Privacy" tone="info">
           MVP 阶段不收集护照号码或身份证件。

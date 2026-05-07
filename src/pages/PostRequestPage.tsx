@@ -1,13 +1,14 @@
-import { FormEvent, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { FormEvent, useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import FormField from "../components/FormField";
 import Notice from "../components/Notice";
-import { createOrOpenConversation } from "../lib/conversations";
+import { citiesFor, cityLabel, countries, countryLabel, type CountryName } from "../lib/cities";
 import { useLanguage } from "../lib/language";
-import { itemCategories, matchingCarriers, requestRoute } from "../lib/matching";
-import { createRequestSubmission, getSubmissions } from "../lib/submissions";
-import type { CarrierSubmission, ChinaDomesticShipping, ItemCategory } from "../types";
+import { itemCategories, matchingCarriers } from "../lib/matching";
+import { createRequestSubmission, getSubmissions, updateSubmission } from "../lib/submissions";
+import { profileNickname } from "../lib/profile";
+import type { CarrierSubmission, ChinaDomesticShipping, ItemCategory, RequestSubmission } from "../types";
 
 const chinaDomesticShippingOptions: ChinaDomesticShipping[] = [
   "Yes / 是" as ChinaDomesticShipping,
@@ -16,10 +17,13 @@ const chinaDomesticShippingOptions: ChinaDomesticShipping[] = [
 ];
 
 const initialForm = {
-  name: "",
+  name: profileNickname(),
+  ownerNickname: profileNickname(),
   contact: "Platform messaging",
-  fromLocation: "",
-  toLocation: "",
+  fromCountry: "China" as CountryName,
+  fromLocation: "Shanghai",
+  toCountry: "France" as CountryName,
+  toLocation: "Paris",
   itemName: "",
   itemCategory: "Documents" as ItemCategory,
   estimatedValueEur: "",
@@ -31,14 +35,57 @@ const initialForm = {
   complianceConfirmation: false,
 };
 
+const requestDraftKey = "studentCarryRequestDraft";
+
 export default function PostRequestPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get("edit");
   const { t } = useLanguage();
   const [form, setForm] = useState(initialForm);
   const [state, setState] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [error, setError] = useState("");
   const [matches, setMatches] = useState<Array<{ carrier: CarrierSubmission; score: number }>>([]);
   const [showMatches, setShowMatches] = useState(false);
+
+  useEffect(() => {
+    if (!editId) {
+      const saved = window.sessionStorage.getItem(requestDraftKey);
+      if (saved) {
+        setForm({
+          ...initialForm,
+          ...JSON.parse(saved),
+          name: profileNickname(),
+          ownerNickname: profileNickname(),
+        });
+      } else {
+        setForm((current) => ({ ...current, name: profileNickname(), ownerNickname: profileNickname() }));
+      }
+      return;
+    }
+
+    void getSubmissions().then((submissions) => {
+      const existing = submissions.find(
+        (submission): submission is RequestSubmission =>
+          submission.type === "request" && submission.id === editId,
+      );
+      if (!existing) return;
+      setForm({
+        ...initialForm,
+        ...existing,
+        fromCountry: (existing.fromCountry || "China") as CountryName,
+        toCountry: (existing.toCountry || "France") as CountryName,
+        estimatedValueEur: String(existing.estimatedValueEur || ""),
+        budgetEur: String(existing.budgetEur || ""),
+      });
+    });
+  }, [editId]);
+
+  useEffect(() => {
+    if (!editId) {
+      window.sessionStorage.setItem(requestDraftKey, JSON.stringify(form));
+    }
+  }, [editId, form]);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -57,21 +104,20 @@ export default function PostRequestPage() {
     setState("submitting");
     setError("");
 
-    const canContinue = window.confirm(
-      `支付待接入 / Payment pending\n\n当前为 MVP H5 测试环境，无法直接完成微信支付。正式版将为预算 €${form.budgetEur} 拉起支付。\n\n点击确定继续保存发布。`,
-    );
-
-    if (!canContinue) {
-      setState("idle");
-      return;
-    }
-
     try {
-      await createRequestSubmission({
+      const payload = {
         ...form,
+        name: profileNickname(),
+        ownerNickname: profileNickname(),
         estimatedValueEur: Number(form.estimatedValueEur),
         budgetEur: Number(form.budgetEur),
-      });
+      };
+      if (editId) {
+        await updateSubmission(editId, payload);
+      } else {
+        await createRequestSubmission(payload);
+      }
+      window.sessionStorage.removeItem(requestDraftKey);
       setForm(initialForm);
       setShowMatches(false);
       setState("success");
@@ -87,30 +133,12 @@ export default function PostRequestPage() {
     }
   }
 
-  function contactMatchingCarrier() {
-    const match = matches[0]?.carrier;
-    if (!match) {
-      return;
-    }
-
-    const conversation = createOrOpenConversation({
-      postType: "carry",
-      postId: match.id,
-      otherUserName: match.name || "Carrier",
-      item: form.itemName || "Request",
-      route: requestRoute(form),
-      reward: `€${form.budgetEur || 0}`,
-      status: "Negotiating",
-    });
-    navigate(`/messages/${conversation.id}`);
-  }
-
   return (
     <section className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
       <BackButton fallback="/" />
       <div className="mb-5 rounded-[26px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
         <p className="text-xs font-bold text-slate-400">Request</p>
-        <h1 className="mt-2 text-3xl font-black text-white">{t("Post a request", "帮我带")}</h1>
+        <h1 className="mt-2 text-3xl font-black text-white">{editId ? t("Edit request", "编辑帮我带") : t("Post a request", "帮我带")}</h1>
         <p className="mt-2 text-sm leading-6 text-slate-300">
           {t(
             "Share route, item details, date, reward, and payment.",
@@ -138,17 +166,31 @@ export default function PostRequestPage() {
 
       <form onSubmit={handleSubmit} className="grid gap-5 rounded-[32px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl sm:p-6">
         <div className="grid gap-5 sm:grid-cols-2">
-          <FormField id="name" label={"姓名\nName"} required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-          <Notice title="联系方式 / Contact" tone="info">
+          <Notice title="Poster / 发布者" tone="info">
+            {profileNickname()}
+          </Notice>
+          <Notice title="Contact / 联系方式" tone="info">
             联系方式将通过平台消息系统进行沟通。
             Contact details will be handled through the platform messaging system.
           </Notice>
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
-          <FormField id="fromLocation" label={"出发城市/国家\nFrom city/country"} required placeholder="Shanghai, China" value={form.fromLocation} onChange={(event) => setForm({ ...form, fromLocation: event.target.value })} />
-          <FormField id="toLocation" label={"到达城市/国家\nTo city/country"} required placeholder="Paris, France" value={form.toLocation} onChange={(event) => setForm({ ...form, toLocation: event.target.value })} />
+          <RouteSelect
+            label="Departure / 出发地"
+            country={form.fromCountry}
+            city={form.fromLocation}
+            onCountryChange={(country) => setForm({ ...form, fromCountry: country, fromLocation: citiesFor(country)[0] })}
+            onCityChange={(city) => setForm({ ...form, fromLocation: city })}
+          />
+          <RouteSelect
+            label="Arrival / 到达地"
+            country={form.toCountry}
+            city={form.toLocation}
+            onCountryChange={(country) => setForm({ ...form, toCountry: country, toLocation: citiesFor(country)[0] })}
+            onCityChange={(city) => setForm({ ...form, toLocation: city })}
+          />
         </div>
-        <FormField id="itemName" label={"物品名称\nItem name"} required placeholder="课本 / Textbook" value={form.itemName} onChange={(event) => setForm({ ...form, itemName: event.target.value })} />
+        <FormField id="itemName" label={"Item\n物品"} required placeholder="Textbook" value={form.itemName} onChange={(event) => setForm({ ...form, itemName: event.target.value })} />
         <label htmlFor="itemCategory" className="block">
           <span className="whitespace-pre-line text-sm font-semibold leading-6 text-slate-100">
             物品分类{"\n"}Item category
@@ -165,9 +207,9 @@ export default function PostRequestPage() {
           </select>
         </label>
         <div className="grid gap-5 sm:grid-cols-3">
-          <FormField id="estimatedValueEur" label={"预估价值 EUR\nEstimated value in EUR"} type="number" min="0" step="0.01" required value={form.estimatedValueEur} onChange={(event) => setForm({ ...form, estimatedValueEur: event.target.value })} />
-          <FormField id="desiredDeliveryDate" label={"期望送达日期\nDesired delivery date"} type="date" required value={form.desiredDeliveryDate} onChange={(event) => setForm({ ...form, desiredDeliveryDate: event.target.value })} />
-          <FormField id="budgetEur" label={"预算 EUR\nBudget in EUR"} type="number" min="0" step="0.01" required value={form.budgetEur} onChange={(event) => setForm({ ...form, budgetEur: event.target.value })} />
+          <FormField id="estimatedValueEur" label={"Item estimated value EUR\n物品预估价值 EUR"} type="number" min="0" step="0.01" required value={form.estimatedValueEur} onChange={(event) => setForm({ ...form, estimatedValueEur: event.target.value })} />
+          <FormField id="desiredDeliveryDate" label={t("Desired delivery date", "期望送达日期")} type="date" required value={form.desiredDeliveryDate} onChange={(event) => setForm({ ...form, desiredDeliveryDate: event.target.value })} />
+          <FormField id="budgetEur" label={"Order budget EUR\n本单预算 EUR"} type="number" min="0" step="0.01" required value={form.budgetEur} onChange={(event) => setForm({ ...form, budgetEur: event.target.value })} />
         </div>
         <label htmlFor="chinaDomesticShipping" className="block">
           <span className="whitespace-pre-line text-sm font-semibold leading-6 text-slate-100">
@@ -237,7 +279,7 @@ export default function PostRequestPage() {
           disabled={state === "submitting" || !form.confirmation || !form.complianceConfirmation}
           className="min-h-14 rounded-2xl bg-[#38bdf8] px-5 py-3 text-sm font-black text-white transition hover:bg-[#0ea5e9] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {state === "submitting" ? "Submitting..." : "查看匹配建议 / Review matching carriers"}
+          {state === "submitting" ? "Submitting..." : t("Review matching carriers", "查看匹配建议")}
         </button>
       </form>
 
@@ -247,37 +289,73 @@ export default function PostRequestPage() {
           <p className="mt-1 text-sm text-slate-400">Possible matching carry posts</p>
           <div className="mt-4 grid gap-3">
             {matches.length ? matches.map(({ carrier, score }) => (
-              <article key={carrier.id} className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
+              <Link key={carrier.id} to={`/market/carry/${carrier.id}`} className="block rounded-[24px] border border-white/10 bg-white/[0.06] p-4 transition hover:border-sky-300/30">
                 <p className="text-sm font-black text-white">{carrier.travelRoute}</p>
                 <p className="mt-2 text-sm text-slate-400">{carrier.travelDate} · {carrier.availableLuggageSpace}</p>
                 <p className="mt-2 text-sm font-black text-sky-200">{carrier.expectedReward}</p>
                 <p className="mt-2 text-xs text-slate-500">Match score: {score}</p>
-              </article>
+              </Link>
             )) : (
               <p className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4 text-sm text-slate-400">
                 暂无合适的顺路送匹配，你仍然可以发布需求。
               </p>
             )}
           </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              disabled={!matches.length}
-              onClick={contactMatchingCarrier}
-              className="pressable min-h-14 rounded-2xl bg-[#38bdf8] px-4 text-sm font-black text-white disabled:opacity-50"
-            >
-              Contact Matching Carrier
-            </button>
+          <div className="mt-5 grid gap-3">
             <button
               type="button"
               onClick={() => void publishRequest()}
-              className="pressable min-h-14 rounded-2xl border border-white/15 bg-white/10 px-4 text-sm font-black text-white"
+              className="pressable min-h-14 rounded-2xl bg-[#38bdf8] px-4 text-sm font-black text-white"
             >
-              Still Publish Request
+              {t("Publish request", "直接发布需求")}
             </button>
           </div>
         </section>
       ) : null}
     </section>
+  );
+}
+
+function RouteSelect({
+  label,
+  country,
+  city,
+  onCountryChange,
+  onCityChange,
+}: {
+  label: string;
+  country: CountryName;
+  city: string;
+  onCountryChange: (country: CountryName) => void;
+  onCityChange: (city: string) => void;
+}) {
+  const { language } = useLanguage();
+  const cityOptions = citiesFor(country);
+  const selectedCity = city || cityOptions[0];
+
+  return (
+    <div>
+      <p className="text-sm font-semibold leading-6 text-slate-100">{label}</p>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <select
+          value={country}
+          onChange={(event) => onCountryChange(event.target.value as CountryName)}
+          className="block w-full min-w-0 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none focus:border-[#38bdf8]"
+        >
+          {countries.map((option) => (
+            <option key={option} value={option}>{countryLabel(option, language)}</option>
+          ))}
+        </select>
+        <select
+          value={selectedCity}
+          onChange={(event) => onCityChange(event.target.value)}
+          className="block w-full min-w-0 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none focus:border-[#38bdf8]"
+        >
+          {cityOptions.map((option) => (
+            <option key={option} value={option}>{cityLabel(option, language)}</option>
+          ))}
+        </select>
+      </div>
+    </div>
   );
 }

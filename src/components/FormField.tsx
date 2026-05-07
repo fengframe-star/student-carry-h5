@@ -13,7 +13,7 @@ type TextareaProps = BaseProps &
 export default function FormField(props: InputProps | TextareaProps) {
   const { id, label, children, kind, className, ...fieldProps } = props;
   const fieldClass =
-    "mt-2 w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-[#38bdf8] focus:ring-4 focus:ring-sky-400/10";
+    "mt-2 block w-full min-w-0 max-w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-[#38bdf8] focus:ring-4 focus:ring-sky-400/10";
 
   return (
     <label htmlFor={id} className="block">

@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDocs,
   orderBy,
@@ -151,6 +152,30 @@ export async function updateSubmissionDate(
   }
 
   await updateDoc(doc(requireDb(), collectionName, id), { [field]: value });
+}
+
+export async function updateSubmission(id: string, data: Partial<Submission>) {
+  if (!db) {
+    const next = readLocal<Submission>(localSubmissionsKey).map((submission) =>
+      submission.id === id ? ({ ...submission, ...data } as Submission) : submission,
+    );
+    window.localStorage.setItem(localSubmissionsKey, JSON.stringify(next));
+    return;
+  }
+
+  await updateDoc(doc(requireDb(), collectionName, id), data);
+}
+
+export async function deleteSubmission(id: string) {
+  if (!db) {
+    const next = readLocal<Submission>(localSubmissionsKey).filter(
+      (submission) => submission.id !== id,
+    );
+    window.localStorage.setItem(localSubmissionsKey, JSON.stringify(next));
+    return;
+  }
+
+  await deleteDoc(doc(requireDb(), collectionName, id));
 }
 
 export async function createRegistrationSubmission(data: RegistrationInput) {

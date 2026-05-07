@@ -79,12 +79,12 @@ export default function MessagesPage() {
         onMouseDown={(event) => setTouchStart(event.clientX)}
         onMouseUp={(event) => handleTouchEnd(event.clientX)}
       >
-        <div className="relative mx-auto h-[166px] max-w-[420px]">
+        <div className="relative mx-auto h-[88px] max-w-[420px]">
           {messageCards.map((card, index) => {
             const Icon = card.icon;
             const position = (index - activeCard + messageCards.length) % messageCards.length;
             const isFront = position === 0;
-            const offset = position === 0 ? 0 : position === 1 ? 62 : -62;
+            const offset = position === 0 ? 0 : position === 1 ? 34 : -34;
             const cardStyle = {
               transform: `translateX(${offset}px) scale(${isFront ? 1 : 0.92})`,
               opacity: isFront ? 1 : 0.35,
@@ -95,18 +95,18 @@ export default function MessagesPage() {
             return (
               <article
                 key={card.titleEn}
-                className="how-stack-card absolute inset-x-6 top-0 rounded-[22px] border border-white/10 bg-[#171b2b]/95 p-3.5 shadow-xl backdrop-blur"
+                className="how-stack-card absolute inset-x-0 top-0 h-[82px] overflow-hidden rounded-[20px] border border-white/10 bg-[#171b2b]/95 p-2.5 shadow-xl backdrop-blur"
                 style={cardStyle}
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h2 className="text-sm font-black text-white">{t(card.titleEn, card.titleCn)}</h2>
+                    <h2 className="text-xs font-black text-white">{t(card.titleEn, card.titleCn)}</h2>
                   </div>
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#38bdf8]/15 text-[#7dd3fc] ring-1 ring-[#38bdf8]/30">
-                    <Icon size={17} strokeWidth={2.4} />
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-[#38bdf8]/15 text-[#7dd3fc] ring-1 ring-[#38bdf8]/30">
+                    <Icon size={14} strokeWidth={2.4} />
                   </span>
                 </div>
-                <p className="mt-4 text-xs leading-5 text-slate-300">{t(card.bodyEn, card.bodyCn)}</p>
+                <p className="mt-1.5 line-clamp-2 text-[0.62rem] leading-4 text-slate-300">{t(card.bodyEn, card.bodyCn)}</p>
               </article>
             );
           })}

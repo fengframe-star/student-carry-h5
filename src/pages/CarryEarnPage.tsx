@@ -1,18 +1,24 @@
-import { FormEvent, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { FormEvent, useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import FormField from "../components/FormField";
 import Notice from "../components/Notice";
-import { createOrOpenConversation } from "../lib/conversations";
+import { citiesFor, cityLabel, countries, countryLabel, routeFromParts, type CountryName } from "../lib/cities";
 import { useLanguage } from "../lib/language";
 import { itemCategories, matchingRequests } from "../lib/matching";
-import { createCarrierSubmission, getSubmissions } from "../lib/submissions";
-import type { ItemCategory, RequestSubmission } from "../types";
+import { createCarrierSubmission, getSubmissions, updateSubmission } from "../lib/submissions";
+import { profileNickname } from "../lib/profile";
+import type { CarrierSubmission, ItemCategory, RequestSubmission } from "../types";
 
 const initialForm = {
-  name: "",
+  name: profileNickname(),
+  ownerNickname: profileNickname(),
   contact: "Platform messaging",
-  travelRoute: "",
+  fromCountry: "China" as CountryName,
+  fromLocation: "Shanghai",
+  toCountry: "France" as CountryName,
+  toLocation: "Paris",
+  travelRoute: "Shanghai → Paris",
   travelDate: "",
   availableLuggageSpace: "",
   acceptedItemTypes: ["Documents"] as ItemCategory[],
@@ -22,8 +28,12 @@ const initialForm = {
   complianceConfirmation: false,
 };
 
+const carryDraftKey = "studentCarryCarryDraft";
+
 export default function CarryEarnPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get("edit");
   const { t } = useLanguage();
   const [form, setForm] = useState(initialForm);
   const [state, setState] = useState<"idle" | "submitting" | "success" | "error">("idle");
@@ -31,12 +41,52 @@ export default function CarryEarnPage() {
   const [matches, setMatches] = useState<Array<{ request: RequestSubmission; score: number }>>([]);
   const [showMatches, setShowMatches] = useState(false);
 
+  useEffect(() => {
+    if (!editId) {
+      const saved = window.sessionStorage.getItem(carryDraftKey);
+      if (saved) {
+        setForm({
+          ...initialForm,
+          ...JSON.parse(saved),
+          name: profileNickname(),
+          ownerNickname: profileNickname(),
+        });
+      } else {
+        setForm((current) => ({ ...current, name: profileNickname(), ownerNickname: profileNickname() }));
+      }
+      return;
+    }
+
+    void getSubmissions().then((submissions) => {
+      const existing = submissions.find(
+        (submission): submission is CarrierSubmission =>
+          submission.type === "carrier" && submission.id === editId,
+      );
+      if (!existing) return;
+      setForm({
+        ...initialForm,
+        ...existing,
+        fromCountry: (existing.fromCountry || "China") as CountryName,
+        fromLocation: existing.fromLocation || existing.travelRoute.split("→")[0]?.trim() || "Shanghai",
+        toCountry: (existing.toCountry || "France") as CountryName,
+        toLocation: existing.toLocation || existing.travelRoute.split("→")[1]?.trim() || "Paris",
+        acceptedItemTypes: existing.acceptedItemTypes || ["Documents"],
+      });
+    });
+  }, [editId]);
+
+  useEffect(() => {
+    if (!editId) {
+      window.sessionStorage.setItem(carryDraftKey, JSON.stringify(form));
+    }
+  }, [editId, form]);
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setState("idle");
     setError("");
     const submissions = await getSubmissions();
-    setMatches(matchingRequests(form, submissions));
+    setMatches(matchingRequests({ ...form, travelRoute: routeFromParts(form.fromLocation, form.toLocation) }, submissions));
     setShowMatches(true);
   }
 
@@ -45,7 +95,18 @@ export default function CarryEarnPage() {
     setError("");
 
     try {
-      await createCarrierSubmission(form);
+      const payload = {
+        ...form,
+        name: profileNickname(),
+        ownerNickname: profileNickname(),
+        travelRoute: routeFromParts(form.fromLocation, form.toLocation),
+      };
+      if (editId) {
+        await updateSubmission(editId, payload);
+      } else {
+        await createCarrierSubmission(payload);
+      }
+      window.sessionStorage.removeItem(carryDraftKey);
       setForm(initialForm);
       setShowMatches(false);
       setState("success");
@@ -59,24 +120,6 @@ export default function CarryEarnPage() {
       );
       setState("error");
     }
-  }
-
-  function contactRequestUser() {
-    const match = matches[0]?.request;
-    if (!match) {
-      return;
-    }
-
-    const conversation = createOrOpenConversation({
-      postType: "request",
-      postId: match.id,
-      otherUserName: match.name || "Request user",
-      item: match.itemName || "Request",
-      route: `${match.fromLocation || "From"} → ${match.toLocation || "To"}`,
-      reward: `€${match.budgetEur || 0}`,
-      status: "Negotiating",
-    });
-    navigate(`/messages/${conversation.id}`);
   }
 
   function toggleAcceptedItemType(category: ItemCategory) {
@@ -93,7 +136,7 @@ export default function CarryEarnPage() {
       <BackButton fallback="/" />
       <div className="mb-5 rounded-[26px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
         <p className="text-xs font-bold text-slate-400">Carry</p>
-        <h1 className="mt-2 text-3xl font-black text-white">{t("Carry & earn", "顺路送")}</h1>
+        <h1 className="mt-2 text-3xl font-black text-white">{editId ? t("Edit carry post", "编辑顺路送") : t("Carry & earn", "顺路送")}</h1>
         <p className="mt-2 text-sm leading-6 text-slate-300">
           {t("Add your route, travel date, space, and expected reward.", "填写路线、旅行日期、可用空间和期望报酬。")}
         </p>
@@ -118,15 +161,32 @@ export default function CarryEarnPage() {
 
       <form onSubmit={handleSubmit} className="grid gap-5 rounded-[32px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl sm:p-6">
         <div className="grid gap-5 sm:grid-cols-2">
-          <FormField id="name" label={"姓名\nName"} required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-          <Notice title="联系方式 / Contact" tone="info">
+          <Notice title="Poster / 发布者" tone="info">
+            {profileNickname()}
+          </Notice>
+          <Notice title="Contact / 联系方式" tone="info">
             联系方式将通过平台消息系统进行沟通。
             Contact details will be handled through the platform messaging system.
           </Notice>
         </div>
         <div className="grid gap-5 sm:grid-cols-2">
-          <FormField id="travelRoute" label={"旅行路线\nTravel route"} required placeholder="Shanghai → Paris" value={form.travelRoute} onChange={(event) => setForm({ ...form, travelRoute: event.target.value })} />
-          <FormField id="travelDate" label={"旅行日期\nTravel date"} type="date" required value={form.travelDate} onChange={(event) => setForm({ ...form, travelDate: event.target.value })} />
+          <RouteSelect
+            label="Departure / 出发地"
+            country={form.fromCountry}
+            city={form.fromLocation}
+            onCountryChange={(country) => setForm({ ...form, fromCountry: country, fromLocation: citiesFor(country)[0] })}
+            onCityChange={(city) => setForm({ ...form, fromLocation: city })}
+          />
+          <RouteSelect
+            label="Arrival / 到达地"
+            country={form.toCountry}
+            city={form.toLocation}
+            onCountryChange={(country) => setForm({ ...form, toCountry: country, toLocation: citiesFor(country)[0] })}
+            onCityChange={(city) => setForm({ ...form, toLocation: city })}
+          />
+        </div>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <FormField id="travelDate" label={t("Travel date", "旅行日期")} type="date" required value={form.travelDate} onChange={(event) => setForm({ ...form, travelDate: event.target.value })} />
         </div>
         <div>
           <p className="whitespace-pre-line text-sm font-semibold leading-6 text-slate-100">
@@ -205,37 +265,73 @@ export default function CarryEarnPage() {
           <p className="mt-1 text-sm text-slate-400">Possible matching requests</p>
           <div className="mt-4 grid gap-3">
             {matches.length ? matches.map(({ request, score }) => (
-              <article key={request.id} className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
+              <Link key={request.id} to={`/market/request/${request.id}`} className="block rounded-[24px] border border-white/10 bg-white/[0.06] p-4 transition hover:border-sky-300/30">
                 <p className="text-sm font-black text-white">{request.fromLocation} → {request.toLocation}</p>
                 <p className="mt-2 text-sm text-slate-400">{request.itemName} · {request.desiredDeliveryDate}</p>
                 <p className="mt-2 text-sm font-black text-sky-200">€{request.budgetEur}</p>
                 <p className="mt-2 text-xs text-slate-500">Match score: {score}</p>
-              </article>
+              </Link>
             )) : (
               <p className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4 text-sm text-slate-400">
                 暂无合适的帮我带匹配，你仍然可以发布行程。
               </p>
             )}
           </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              disabled={!matches.length}
-              onClick={contactRequestUser}
-              className="pressable min-h-14 rounded-2xl bg-[#38bdf8] px-4 text-sm font-black text-white disabled:opacity-50"
-            >
-              Contact Request User
-            </button>
+          <div className="mt-5 grid gap-3">
             <button
               type="button"
               onClick={() => void publishCarryPost()}
-              className="pressable min-h-14 rounded-2xl border border-white/15 bg-white/10 px-4 text-sm font-black text-white"
+              className="pressable min-h-14 rounded-2xl bg-[#38bdf8] px-4 text-sm font-black text-white"
             >
-              Still Publish Carry Post
+              {t("Publish carry post", "直接发布行程")}
             </button>
           </div>
         </section>
       ) : null}
     </section>
+  );
+}
+
+function RouteSelect({
+  label,
+  country,
+  city,
+  onCountryChange,
+  onCityChange,
+}: {
+  label: string;
+  country: CountryName;
+  city: string;
+  onCountryChange: (country: CountryName) => void;
+  onCityChange: (city: string) => void;
+}) {
+  const { language } = useLanguage();
+  const cityOptions = citiesFor(country);
+  const selectedCity = city || cityOptions[0];
+
+  return (
+    <div>
+      <p className="text-sm font-semibold leading-6 text-slate-100">{label}</p>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <select
+          value={country}
+          onChange={(event) => onCountryChange(event.target.value as CountryName)}
+          className="block w-full min-w-0 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none focus:border-[#38bdf8]"
+        >
+          {countries.map((option) => (
+            <option key={option} value={option}>{countryLabel(option, language)}</option>
+          ))}
+        </select>
+        <select
+          value={selectedCity}
+          onChange={(event) => onCityChange(event.target.value)}
+          className="block w-full min-w-0 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none focus:border-[#38bdf8]"
+        >
+          {cityOptions.map((option) => (
+            <option key={option} value={option}>{cityLabel(option, language)}</option>
+          ))}
+        </select>
+      </div>
+    </div>
   );
 }
