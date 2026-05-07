@@ -1,5 +1,6 @@
 const SUBMISSIONS_KEY = "studentCarrySubmissions";
 const REGISTRATIONS_KEY = "studentCarryRegistrations";
+const CONVERSATIONS_KEY = "studentCarryConversations";
 
 function getCloudDb() {
   if (wx.cloud) {
@@ -16,6 +17,7 @@ function nowDate() {
 function withMeta(data) {
   return {
     ...data,
+    status: data.status || "Open",
     createdAt: Date.now(),
     publishedDate: data.publishedDate || nowDate()
   };
@@ -81,6 +83,78 @@ async function getSubmissions() {
   }
 
   return readLocal(SUBMISSIONS_KEY);
+}
+
+function getConversationId(postType, postId) {
+  return `${postType}-${postId}`;
+}
+
+function getConversations() {
+  return readLocal(CONVERSATIONS_KEY);
+}
+
+function getConversation(id) {
+  return getConversations().find((item) => item.id === id) || null;
+}
+
+function saveConversations(conversations) {
+  wx.setStorageSync(CONVERSATIONS_KEY, conversations);
+}
+
+function createOrOpenConversation(input) {
+  const id = getConversationId(input.postType, input.postId);
+  const conversations = getConversations();
+  const existing = conversations.find((item) => item.id === id);
+
+  if (existing) {
+    return existing;
+  }
+
+  const conversation = {
+    ...input,
+    id,
+    otherUserInitial: (input.otherUserName || "P").slice(0, 1),
+    latestPreview: "Hi, I would like to discuss this post.",
+    latestTime: "Just now",
+    unread: true,
+    messages: [
+      {
+        author: "Me",
+        text: "Hi, I would like to discuss this post."
+      },
+      {
+        author: "Post owner",
+        text: "Sure, we can confirm the details here."
+      }
+    ]
+  };
+
+  saveConversations([conversation, ...conversations]);
+  return conversation;
+}
+
+function markConversationRead(id) {
+  saveConversations(
+    getConversations().map((item) =>
+      item.id === id ? { ...item, unread: false } : item
+    )
+  );
+}
+
+function appendConversationMessage(id, text) {
+  const next = getConversations().map((item) =>
+    item.id === id
+      ? {
+          ...item,
+          latestPreview: text,
+          latestTime: "Now",
+          unread: false,
+          messages: [...item.messages, { author: "Me", text }]
+        }
+      : item
+  );
+  saveConversations(next);
+  return next.find((item) => item.id === id) || null;
 }
 
 async function getRegistrations() {
@@ -156,8 +230,13 @@ async function updateSubmissionDate(id, field, value) {
 module.exports = {
   addSubmission,
   addRegistration,
+  appendConversationMessage,
+  createOrOpenConversation,
+  getConversation,
+  getConversations,
   getRegistrations,
   getSubmissions,
+  markConversationRead,
   updateSubmissionDate,
   updatePublishedDate
 };

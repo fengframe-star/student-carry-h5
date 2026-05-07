@@ -1,0 +1,34 @@
+<view class="page detail-page">
+  <button class="back-button" bindtap="goBack">← 返回 / Back</button>
+
+  <view class="card" wx:if="{{carry}}">
+    <view class="eyebrow">顺路送 / Carry detail</view>
+    <view class="title compact-title">{{carry.travelRoute || "Route pending"}}</view>
+    <view class="route-title">{{carry.availableLuggageSpace || "Available luggage space"}}</view>
+    <view class="detail-grid">
+      <view class="detail-cell">
+        <view class="detail-label">Travel date</view>
+        <view class="detail-value">{{carry.travelDate || "TBD"}}</view>
+      </view>
+      <view class="detail-cell">
+        <view class="detail-label">Expected reward</view>
+        <view class="detail-value">{{carry.expectedReward || "Reward pending"}}</view>
+      </view>
+      <view class="detail-cell">
+        <view class="detail-label">Status</view>
+        <view class="detail-value">{{carry.status || "New"}}</view>
+      </view>
+      <view class="detail-cell">
+        <view class="detail-label">Published</view>
+        <view class="detail-value">{{carry.publishedDate || "TBD"}}</view>
+      </view>
+    </view>
+    <view class="item-note" wx:if="{{carry.notes}}">{{carry.notes}}</view>
+  </view>
+
+  <view class="card muted" wx:else>This carry post could not be found.</view>
+
+  <view class="contact-bar">
+    <button class="primary-button contact-button" bindtap="contactNow">立即联系 / Contact Now</button>
+  </view>
+</view>

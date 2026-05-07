@@ -3,7 +3,11 @@ import { useNavigate } from "react-router-dom";
 import BackButton from "../components/BackButton";
 import FormField from "../components/FormField";
 import Notice from "../components/Notice";
-import { createCarrierSubmission } from "../lib/submissions";
+import { createOrOpenConversation } from "../lib/conversations";
+import { useLanguage } from "../lib/language";
+import { itemCategories, matchingRequests } from "../lib/matching";
+import { createCarrierSubmission, getSubmissions } from "../lib/submissions";
+import type { ItemCategory, RequestSubmission } from "../types";
 
 const initialForm = {
   name: "",
@@ -11,28 +15,42 @@ const initialForm = {
   travelRoute: "",
   travelDate: "",
   availableLuggageSpace: "",
+  acceptedItemTypes: ["Documents"] as ItemCategory[],
   expectedReward: "",
   notes: "",
   agreement: false,
+  complianceConfirmation: false,
 };
 
 export default function CarryEarnPage() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [form, setForm] = useState(initialForm);
   const [state, setState] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [error, setError] = useState("");
+  const [matches, setMatches] = useState<Array<{ request: RequestSubmission; score: number }>>([]);
+  const [showMatches, setShowMatches] = useState(false);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    setState("idle");
+    setError("");
+    const submissions = await getSubmissions();
+    setMatches(matchingRequests(form, submissions));
+    setShowMatches(true);
+  }
+
+  async function publishCarryPost() {
     setState("submitting");
     setError("");
 
     try {
       await createCarrierSubmission(form);
       setForm(initialForm);
+      setShowMatches(false);
       setState("success");
       window.localStorage.setItem("studentCarryLoggedIn", "true");
-      setTimeout(() => navigate("/my"), 600);
+      setTimeout(() => navigate("/market"), 600);
     } catch (submissionError) {
       setError(
         submissionError instanceof Error
@@ -43,18 +61,41 @@ export default function CarryEarnPage() {
     }
   }
 
+  function contactRequestUser() {
+    const match = matches[0]?.request;
+    if (!match) {
+      return;
+    }
+
+    const conversation = createOrOpenConversation({
+      postType: "request",
+      postId: match.id,
+      otherUserName: match.name || "Request user",
+      item: match.itemName || "Request",
+      route: `${match.fromLocation || "From"} → ${match.toLocation || "To"}`,
+      reward: `€${match.budgetEur || 0}`,
+      status: "Negotiating",
+    });
+    navigate(`/messages/${conversation.id}`);
+  }
+
+  function toggleAcceptedItemType(category: ItemCategory) {
+    setForm((current) => ({
+      ...current,
+      acceptedItemTypes: current.acceptedItemTypes.includes(category)
+        ? current.acceptedItemTypes.filter((item) => item !== category)
+        : [...current.acceptedItemTypes, category],
+    }));
+  }
+
   return (
-    <section className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+    <section className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
       <BackButton fallback="/" />
-      <div className="mb-6">
-        <p className="text-sm font-bold text-slate-300">
-          <span className="block">顺路送</span>
-          <span className="mt-1 block text-slate-400">Carry</span>
-        </p>
-        <h1 className="mt-3 text-5xl font-black text-white">顺路送</h1>
-        <p className="mt-4 leading-7 text-slate-300">
-          <span className="block">填写你的路线和可用行李空间，方便后续匹配合适需求。</span>
-          <span className="block text-slate-400">Add your route and available space so admins can match you with a suitable request.</span>
+      <div className="mb-5 rounded-[26px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
+        <p className="text-xs font-bold text-slate-400">Carry</p>
+        <h1 className="mt-2 text-3xl font-black text-white">{t("Carry & earn", "顺路送")}</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-300">
+          {t("Add your route, travel date, space, and expected reward.", "填写路线、旅行日期、可用空间和期望报酬。")}
         </p>
       </div>
 
@@ -87,6 +128,27 @@ export default function CarryEarnPage() {
           <FormField id="travelRoute" label={"旅行路线\nTravel route"} required placeholder="Shanghai → Paris" value={form.travelRoute} onChange={(event) => setForm({ ...form, travelRoute: event.target.value })} />
           <FormField id="travelDate" label={"旅行日期\nTravel date"} type="date" required value={form.travelDate} onChange={(event) => setForm({ ...form, travelDate: event.target.value })} />
         </div>
+        <div>
+          <p className="whitespace-pre-line text-sm font-semibold leading-6 text-slate-100">
+            可接受物品类型{"\n"}Accepted item types
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {itemCategories.map((category) => (
+              <button
+                key={category}
+                type="button"
+                onClick={() => toggleAcceptedItemType(category)}
+                className={`pressable rounded-2xl border px-3 py-3 text-xs font-black ${
+                  form.acceptedItemTypes.includes(category)
+                    ? "border-sky-300/40 bg-sky-400/20 text-sky-50"
+                    : "border-white/10 bg-white/5 text-slate-300"
+                }`}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="grid gap-5 sm:grid-cols-2">
           <FormField id="availableLuggageSpace" label={"可用行李空间\nAvailable luggage space"} required placeholder="3 kg / shoebox size" value={form.availableLuggageSpace} onChange={(event) => setForm({ ...form, availableLuggageSpace: event.target.value })} />
           <FormField id="expectedReward" label={"期望报酬\nExpected reward"} required placeholder="EUR 20-35" value={form.expectedReward} onChange={(event) => setForm({ ...form, expectedReward: event.target.value })} />
@@ -97,6 +159,10 @@ export default function CarryEarnPage() {
           We do not collect passport numbers or ID documents at MVP stage.
           后续身份验证可能通过可信第三方服务完成。
           Identity verification may be introduced later through a trusted third-party provider.
+        </Notice>
+        <Notice title="禁运与限制物品 / Prohibited and restricted items" tone="warning">
+          禁止危险品、武器、非法物质、受限制电池、大容量液体、灰产代购或转售物品。
+          Dangerous goods, weapons, illegal substances, restricted batteries, large liquids, and gray-market reselling items are not allowed.
         </Notice>
         <label className="flex gap-3 rounded-[24px] bg-sky-400/10 p-4 text-sm leading-6 text-slate-200">
           <input
@@ -111,14 +177,65 @@ export default function CarryEarnPage() {
             {"\n"}I agree to follow platform rules and may be asked for a deposit.
           </span>
         </label>
+        <label className="flex gap-3 rounded-[24px] bg-sky-400/10 p-4 text-sm leading-6 text-slate-200">
+          <input
+            type="checkbox"
+            required
+            checked={form.complianceConfirmation}
+            onChange={(event) => setForm({ ...form, complianceConfirmation: event.target.checked })}
+            className="mt-1 h-4 w-4 rounded border-white/20 bg-white/10 text-[#38bdf8] focus:ring-[#38bdf8]"
+          />
+          <span className="whitespace-pre-line">
+            我确认该物品符合出发地、航空公司与目的地国家/地区规定。
+            {"\n"}I confirm this item complies with airline, customs, and destination regulations.
+          </span>
+        </label>
         <button
           type="submit"
-          disabled={state === "submitting"}
+          disabled={state === "submitting" || !form.agreement || !form.complianceConfirmation}
           className="min-h-14 rounded-2xl bg-[#38bdf8] px-5 py-3 text-sm font-black text-white transition hover:bg-[#0ea5e9] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {state === "submitting" ? "Submitting..." : "提交行程 / Submit travel details"}
+          {state === "submitting" ? "Submitting..." : "查看匹配建议 / Review matching requests"}
         </button>
       </form>
+
+      {showMatches ? (
+        <section className="mt-6 rounded-[32px] border border-white/10 bg-[#1f2232]/95 p-5 shadow-2xl">
+          <h2 className="text-xl font-black text-white">可能匹配的帮我带</h2>
+          <p className="mt-1 text-sm text-slate-400">Possible matching requests</p>
+          <div className="mt-4 grid gap-3">
+            {matches.length ? matches.map(({ request, score }) => (
+              <article key={request.id} className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4">
+                <p className="text-sm font-black text-white">{request.fromLocation} → {request.toLocation}</p>
+                <p className="mt-2 text-sm text-slate-400">{request.itemName} · {request.desiredDeliveryDate}</p>
+                <p className="mt-2 text-sm font-black text-sky-200">€{request.budgetEur}</p>
+                <p className="mt-2 text-xs text-slate-500">Match score: {score}</p>
+              </article>
+            )) : (
+              <p className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4 text-sm text-slate-400">
+                暂无合适的帮我带匹配，你仍然可以发布行程。
+              </p>
+            )}
+          </div>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              disabled={!matches.length}
+              onClick={contactRequestUser}
+              className="pressable min-h-14 rounded-2xl bg-[#38bdf8] px-4 text-sm font-black text-white disabled:opacity-50"
+            >
+              Contact Request User
+            </button>
+            <button
+              type="button"
+              onClick={() => void publishCarryPost()}
+              className="pressable min-h-14 rounded-2xl border border-white/15 bg-white/10 px-4 text-sm font-black text-white"
+            >
+              Still Publish Carry Post
+            </button>
+          </div>
+        </section>
+      ) : null}
     </section>
   );
 }

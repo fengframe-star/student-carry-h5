@@ -1,0 +1,40 @@
+<view class="page chat-page" wx:if="{{conversation}}">
+  <button class="back-button" bindtap="goBack">← 返回 / Back</button>
+
+  <view class="summary-card">
+    <view class="summary-head">
+      <view>
+        <view class="summary-label">Transaction</view>
+        <view class="summary-title">{{conversation.item}}</view>
+        <view class="summary-route">{{conversation.route}}</view>
+      </view>
+      <view class="status-pill">{{conversation.status}}</view>
+    </view>
+    <view class="summary-grid">
+      <view class="summary-cell">Item: {{conversation.item}}</view>
+      <view class="summary-cell">Reward: {{conversation.reward}}</view>
+      <view class="summary-cell">Location: TBD</view>
+      <view class="summary-cell">Time: TBD</view>
+    </view>
+  </view>
+
+  <view class="chat-list">
+    <view wx:for="{{conversation.messages}}" wx:key="index" class="{{item.author === 'Me' ? 'chat-row mine' : 'chat-row'}}">
+      <view class="chat-avatar" wx:if="{{item.author !== 'Me'}}">{{conversation.otherUserInitial || "P"}}</view>
+      <view class="{{item.author === 'Me' ? 'bubble my-bubble' : 'bubble'}}">
+        <view class="bubble-author">{{item.author}}</view>
+        <view>{{item.text}}</view>
+      </view>
+    </view>
+  </view>
+
+  <view class="input-bar">
+    <input class="chat-input" value="{{draft}}" bindinput="onDraftInput" placeholder="Type a message..." />
+    <button class="send-button" bindtap="sendMessage">Send</button>
+  </view>
+</view>
+
+<view class="page" wx:else>
+  <button class="back-button" bindtap="goBack">← 返回 / Back</button>
+  <view class="card muted">Conversation not found.</view>
+</view>

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { reputationFor } from "../lib/matching";
 import { getSubmissions } from "../lib/submissions";
+import { useLanguage } from "../lib/language";
 import type { CarrierSubmission, RequestSubmission, Submission } from "../types";
 
-type ActiveType = "request" | "carrier";
+type ActiveType = "request" | "carrier" | "all";
 
 const chinaOrigins = [
   "china",
@@ -31,6 +33,7 @@ const chinaOrigins = [
 ];
 
 export default function MarketPage() {
+  const { t } = useLanguage();
   const [activeType, setActiveType] = useState<ActiveType>("request");
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,33 +68,54 @@ export default function MarketPage() {
     [carriers, search],
   );
 
-  const activeCount = activeType === "request" ? visibleRequests.length : visibleCarriers.length;
-  const totalCount = activeType === "request" ? requests.length : carriers.length;
+  const activeCount =
+    activeType === "request"
+      ? visibleRequests.length
+      : activeType === "carrier"
+        ? visibleCarriers.length
+        : visibleRequests.length + visibleCarriers.length;
+  const totalCount =
+    activeType === "request"
+      ? requests.length
+      : activeType === "carrier"
+        ? carriers.length
+        : requests.length + carriers.length;
   const publishTo = activeType === "request" ? "/post-request" : "/carry-earn";
+  const visibleAll = [...visibleRequests, ...visibleCarriers].sort((a, b) => {
+    const first = a.createdAt?.getTime?.() ?? 0;
+    const second = b.createdAt?.getTime?.() ?? 0;
+    return second - first;
+  });
 
   return (
-    <section className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
-      <div className="rounded-[32px] border border-white/10 bg-[#1f2232]/90 p-6 shadow-2xl">
-        <p className="text-sm font-bold text-slate-300">Market</p>
-        <h1 className="mt-3 text-5xl font-black text-white">匹配集市</h1>
-        <p className="mt-4 leading-7 text-slate-300">
-          <span className="block">选择你想要查看的类型</span>
-          <span className="block text-slate-400">Choose the type you want to view</span>
+    <section className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="rounded-[26px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
+        <p className="text-xs font-bold text-slate-400">Market</p>
+        <h1 className="mt-2 text-3xl font-black text-white">{t("Market", "匹配集市")}</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-300">
+          {t("Browse public request and carry posts.", "浏览所有公开的帮我带和顺路送发布。")}
         </p>
-        <div className="mt-8 grid grid-cols-2 gap-3">
+        <div className="mt-5 grid grid-cols-3 gap-3">
           <button
             type="button"
             onClick={() => setActiveType("request")}
             className={tabButtonClass(activeType === "request")}
           >
-            帮我带
+            {t("Request", "帮我带")}
           </button>
           <button
             type="button"
             onClick={() => setActiveType("carrier")}
             className={tabButtonClass(activeType === "carrier")}
           >
-            顺路送
+            {t("Carry", "顺路送")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveType("all")}
+            className={tabButtonClass(activeType === "all")}
+          >
+            All
           </button>
         </div>
       </div>
@@ -100,20 +124,22 @@ export default function MarketPage() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm text-slate-400">
-              {search ? `${activeCount} / ${totalCount}` : `${totalCount}`} posts
+              {search ? `${activeCount} / ${totalCount}` : `${totalCount}`} {t("posts", "条发布")}
             </p>
           </div>
           <Link
             to={publishTo}
-            className="shrink-0 rounded-2xl bg-[#38bdf8] px-4 py-3 text-sm font-black text-white"
+            className={`shrink-0 rounded-2xl bg-[#38bdf8] px-4 py-3 text-sm font-black text-white ${activeType === "all" ? "hidden" : ""}`}
           >
-            我要发布
+            {t("Post", "我要发布")}
           </Link>
         </div>
 
         <label className="mt-5 block">
-          <span className="text-sm font-semibold text-slate-100">自定义搜索</span>
-          <span className="mt-1 block text-xs text-slate-500">Search by city to city, e.g. 西安至巴黎 / China to Paris</span>
+          <span className="text-sm font-semibold text-slate-100">{t("Custom search", "自定义搜索")}</span>
+          <span className="mt-1 block text-xs text-slate-500">
+            {t("Search by city to city, e.g. China to Paris", "按城市到城市搜索，例如中国到巴黎")}
+          </span>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -127,30 +153,77 @@ export default function MarketPage() {
         <div className="mt-5 rounded-[28px] border border-white/10 bg-[#1f2232]/90 p-5 text-slate-300">
           Loading...
         </div>
+      ) : activeType === "all" ? (
+        <ListingGrid emptyLabel="暂无发布 / No posts yet.">
+          {visibleAll.map((item, index) =>
+            item.type === "request" ? (
+              <RequestCard key={item.id} item={item} index={index} />
+            ) : (
+              <CarryCard key={item.id} item={item} index={index} />
+            ),
+          )}
+        </ListingGrid>
       ) : activeType === "request" ? (
         <ListingGrid emptyLabel="暂无帮我带发布 / No request posts yet.">
           {visibleRequests.map((item) => (
-            <Link key={item.id} to={`/market/request/${item.id}`} className="market-card block">
-              <p className="market-route">{item.fromLocation || "From"} → {item.toLocation || "To"}</p>
-              <h2 className="market-main">{item.itemName || "Item"}</h2>
-              <p className="market-line">{item.desiredDeliveryDate || "Date pending"}</p>
-              <p className="market-price">€{item.budgetEur || 0}</p>
-            </Link>
+            <RequestCard key={item.id} item={item} index={visibleRequests.indexOf(item)} />
           ))}
         </ListingGrid>
       ) : (
         <ListingGrid emptyLabel="暂无顺路送发布 / No carry posts yet.">
           {visibleCarriers.map((item) => (
-            <Link key={item.id} to={`/market/carry/${item.id}`} className="market-card block">
-              <p className="market-route">{item.travelRoute || "Route pending"}</p>
-              <h2 className="market-main">{item.availableLuggageSpace || "Space pending"}</h2>
-              <p className="market-line">{item.travelDate || "Date pending"}</p>
-              <p className="market-price">{item.expectedReward || "Reward pending"}</p>
-            </Link>
+            <CarryCard key={item.id} item={item} index={visibleCarriers.indexOf(item)} />
           ))}
         </ListingGrid>
       )}
     </section>
+  );
+}
+
+function StatusBadge({ status }: { status?: string }) {
+  return (
+    <span className="rounded-full bg-sky-400/15 px-2.5 py-1 text-[0.68rem] font-black text-sky-100">
+      {status || "Open"}
+    </span>
+  );
+}
+
+function ReputationLine({ index }: { index: number }) {
+  const reputation = reputationFor(index);
+  return (
+    <p className="market-line text-[0.72rem]">
+      Completed: {reputation.completed} · {reputation.active}
+    </p>
+  );
+}
+
+function RequestCard({ item, index }: { item: RequestSubmission; index: number }) {
+  return (
+    <Link to={`/market/request/${item.id}`} className="market-card block">
+      <div className="flex items-center justify-between gap-2">
+        <p className="market-route">{item.fromLocation || "From"} → {item.toLocation || "To"}</p>
+        <StatusBadge status={item.status} />
+      </div>
+      <h2 className="market-main">{item.itemName || "Item"}</h2>
+      <p className="market-line">{item.itemCategory || "Others"} · {item.desiredDeliveryDate || "Date pending"}</p>
+      <p className="market-price">€{item.budgetEur || 0}</p>
+      <ReputationLine index={index} />
+    </Link>
+  );
+}
+
+function CarryCard({ item, index }: { item: CarrierSubmission; index: number }) {
+  return (
+    <Link to={`/market/carry/${item.id}`} className="market-card block">
+      <div className="flex items-center justify-between gap-2">
+        <p className="market-route">{item.travelRoute || "Route pending"}</p>
+        <StatusBadge status={item.status} />
+      </div>
+      <h2 className="market-main">{item.availableLuggageSpace || "Space pending"}</h2>
+      <p className="market-line">{item.acceptedItemTypes?.join(", ") || "Flexible"} · {item.travelDate || "Date pending"}</p>
+      <p className="market-price">{item.expectedReward || "Reward pending"}</p>
+      <ReputationLine index={index} />
+    </Link>
   );
 }
 

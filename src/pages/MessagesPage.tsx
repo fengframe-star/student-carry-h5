@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { BadgeEuro, Clock3, MapPin } from "lucide-react";
 import { getConversations } from "../lib/conversations";
+import { useLanguage } from "../lib/language";
 
 const messageCards = [
   {
@@ -28,8 +29,10 @@ const messageCards = [
 ];
 
 export default function MessagesPage() {
+  const { t } = useLanguage();
   const [activeCard, setActiveCard] = useState(0);
   const [conversations, setConversations] = useState(() => getConversations());
+  const [touchStart, setTouchStart] = useState<number | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -43,21 +46,39 @@ export default function MessagesPage() {
     setConversations(getConversations());
   }, []);
 
+  function goToCard(direction: 1 | -1) {
+    setActiveCard((current) => (current + direction + messageCards.length) % messageCards.length);
+  }
+
+  function handleTouchEnd(clientX: number) {
+    if (touchStart === null) {
+      return;
+    }
+
+    const distance = clientX - touchStart;
+    if (Math.abs(distance) > 34) {
+      goToCard(distance < 0 ? 1 : -1);
+    }
+    setTouchStart(null);
+  }
+
   return (
-    <section className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
-      <div className="rounded-[32px] border border-white/10 bg-[#1f2232]/90 p-6 shadow-2xl">
-        <p className="text-sm font-bold text-slate-300">
-          <span className="block">协商消息</span>
-          <span className="mt-1 block text-slate-400">Message</span>
-        </p>
-        <h1 className="mt-4 text-5xl font-black text-white">Message</h1>
-        <p className="mt-4 leading-7 text-slate-300">
-          <span className="block">用于双方确认价格、地点、时间和交接细节。</span>
-          <span className="block text-slate-400">A space for both sides to confirm price, place, timing, and handoff details.</span>
+    <section className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
+      <div className="rounded-[26px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
+        <p className="text-xs font-bold text-slate-400">{t("Negotiation", "协商")}</p>
+        <h1 className="mt-2 text-3xl font-black text-white">{t("Messages", "消息")}</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-300">
+          {t("Confirm price, place, timing, and handoff details.", "确认价格、地点、时间和交接细节。")}
         </p>
       </div>
 
-      <div className="mt-5 overflow-hidden">
+      <div
+        className="mt-5 overflow-hidden"
+        onTouchStart={(event) => setTouchStart(event.touches[0]?.clientX ?? null)}
+        onTouchEnd={(event) => handleTouchEnd(event.changedTouches[0]?.clientX ?? 0)}
+        onMouseDown={(event) => setTouchStart(event.clientX)}
+        onMouseUp={(event) => handleTouchEnd(event.clientX)}
+      >
         <div className="relative mx-auto h-[166px] max-w-[420px]">
           {messageCards.map((card, index) => {
             const Icon = card.icon;
@@ -79,15 +100,13 @@ export default function MessagesPage() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h2 className="text-sm font-black text-white">{card.titleCn}</h2>
-                    <p className="mt-1 text-xs font-semibold text-slate-400">{card.titleEn}</p>
+                    <h2 className="text-sm font-black text-white">{t(card.titleEn, card.titleCn)}</h2>
                   </div>
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[#38bdf8]/15 text-[#7dd3fc] ring-1 ring-[#38bdf8]/30">
                     <Icon size={17} strokeWidth={2.4} />
                   </span>
                 </div>
-                <p className="mt-4 text-xs leading-5 text-slate-200">{card.bodyCn}</p>
-                <p className="mt-1 text-xs leading-5 text-slate-400">{card.bodyEn}</p>
+                <p className="mt-4 text-xs leading-5 text-slate-300">{t(card.bodyEn, card.bodyCn)}</p>
               </article>
             );
           })}
@@ -139,12 +158,12 @@ export default function MessagesPage() {
       ) : (
         <div className="mt-5 rounded-[28px] border border-white/10 bg-[#1f2232]/90 p-6 text-center shadow-2xl">
           <h2 className="text-lg font-black text-white">暂无消息</h2>
-          <p className="mt-1 text-sm font-semibold text-slate-400">No messages yet</p>
+          <p className="mt-1 text-sm font-semibold text-slate-400">{t("No messages yet", "暂无消息")}</p>
           <p className="mt-4 text-sm leading-6 text-slate-300">
-            当你联系订单发布者后，对话会显示在这里。
-          </p>
-          <p className="mt-1 text-sm leading-6 text-slate-500">
-            Conversations will appear here after you contact a post owner.
+            {t(
+              "Conversations will appear here after you contact a post owner.",
+              "当你联系订单发布者后，对话会显示在这里。",
+            )}
           </p>
         </div>
       )}

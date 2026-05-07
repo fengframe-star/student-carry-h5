@@ -1,5 +1,6 @@
 import { Home, MessageCircle, Store, UserRound } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { useLanguage } from "../lib/language";
 
 const items = [
   { to: "/", label: "Home", icon: Home },
@@ -9,6 +10,8 @@ const items = [
 ];
 
 export default function BottomNav() {
+  const { t } = useLanguage();
+
   return (
     <nav className="fixed inset-x-4 bottom-4 z-30 rounded-[28px] border border-white/10 bg-[#141827]/95 p-2 shadow-2xl backdrop-blur sm:hidden">
       <div className="grid grid-cols-4 gap-1">
@@ -28,7 +31,15 @@ export default function BottomNav() {
               }
             >
               <Icon size={20} aria-hidden="true" />
-              <span className="mt-1">{item.label}</span>
+              <span className="mt-1">
+                {item.label === "Home"
+                  ? t("Home", "首页")
+                  : item.label === "Market"
+                    ? t("Market", "集市")
+                    : item.label === "Message"
+                      ? t("Message", "消息")
+                      : t("My", "我的")}
+              </span>
             </NavLink>
           );
         })}

@@ -1,13 +1,13 @@
 <view class="page">
   <view class="hero">
     <view class="eyebrow">
-      <text class="cn">欧洲学生顺路带物匹配</text>
-      <text class="en">Europe student delivery matching</text>
+      <text class="cn">国际学生跨境顺路带物匹配</text>
+      <text class="en">Cross-border carry matching for international students</text>
     </view>
     <view class="title">Student Carry</view>
     <view class="subtitle">
-      <text class="cn">为欧洲留学生提供小件合法物品的需求发布、行程匹配和基础交易协调。</text>
-      <text class="en">A simple MVP for international students carrying small legal items between cities.</text>
+      <text class="cn">为留学生提供发布需求、浏览行程、沟通协商和线下确认的一站式匹配体验。</text>
+      <text class="en">A student marketplace for posting requests, browsing carry routes, negotiating details, and confirming offline exchanges.</text>
     </view>
     <view class="button-row">
       <button class="primary-button" bindtap="goPost">帮我带 / Request</button>
@@ -15,32 +15,56 @@
     </view>
   </view>
 
-  <view class="card">
-    <view class="row-link" bindtap="goMarket">
-      <view>
-        <view class="row-title">匹配集市</view>
-        <view class="row-subtitle">Market</view>
+  <view class="how-section">
+    <view class="section-title no-margin">如何使用 / How it works</view>
+    <view class="stack-stage">
+      <view
+        wx:for="{{displaySteps}}"
+        wx:key="number"
+        class="stack-card pos-{{item.position}}"
+      >
+        <view class="stack-head">
+          <view>
+            <view class="step-number">{{item.number}}</view>
+            <view class="step-title">{{item.titleCn}}</view>
+            <view class="step-en">{{item.titleEn}}</view>
+          </view>
+          <view class="step-icon">{{item.number}}</view>
+        </view>
+        <view class="step-body">{{item.bodyCn}}</view>
+        <view class="step-body muted">{{item.bodyEn}}</view>
       </view>
-      <view class="chevron">›</view>
     </view>
-    <view class="row-link" bindtap="goMy">
-      <view>
-        <view class="row-title">我的发布与登录</view>
-        <view class="row-subtitle">My posts and login</view>
-      </view>
-      <view class="chevron">›</view>
+    <view class="dots">
+      <view
+        wx:for="{{steps}}"
+        wx:key="number"
+        data-index="{{index}}"
+        bindtap="setStep"
+        class="{{activeStep === index ? 'dot active-dot-mini' : 'dot'}}"
+      ></view>
+    </view>
+
+    <view class="example-card">
+      <view class="item-title">Shanghai → Paris</view>
+      <view class="item-line">Item: Documents · Reward: €20</view>
+      <view class="item-line">Status: Looking for carrier</view>
+      <view class="item-note">示例：从上海到巴黎带一份文件，预算 €20，等待顺路学生接单。</view>
+      <view class="item-note muted">Example: Carry documents from Shanghai to Paris with a €20 reward, waiting for a student carrier.</view>
     </view>
   </view>
 
   <view class="notice">
-    <text class="cn">MVP 阶段不收集护照号码或身份证件。</text>
-    <text class="en">We do not collect passport numbers or ID documents at MVP stage.</text>
-    <text class="cn">后续身份验证可能通过可信第三方服务完成。</text>
-    <text class="en">Identity verification may be introduced later through a trusted third-party provider.</text>
+    <text class="cn">安全与隐私</text>
+    <text class="cn">我们提供基础匹配与沟通服务。用户个人信息默认不会公开展示，平台鼓励通过可信方式完成线下交接与确认。</text>
+    <text class="en">Safety & Privacy</text>
+    <text class="en">We provide basic matching and communication tools for students. Personal information is not publicly displayed by default, and users are encouraged to complete exchanges through trusted offline verification.</text>
   </view>
 
   <view class="notice danger-notice">
-    <text class="cn">平台仅提供匹配与基础交易协调，用户需自行确认海关规定和物品合法性。</text>
-    <text class="en">The platform only supports matching and basic transaction coordination. Users are responsible for customs compliance and item legality.</text>
+    <text class="cn">平台规则</text>
+    <text class="cn">仅支持合法、可正常携带的小件物品。用户需自行确认海关、航空及目的地相关规定，禁止违禁品、灰产代购及受限制物品。</text>
+    <text class="en">Platform Guidelines</text>
+    <text class="en">Only legal and carry-on eligible small items are supported. Users are responsible for checking customs and airline regulations. Prohibited or restricted items are not allowed.</text>
   </view>
 </view>

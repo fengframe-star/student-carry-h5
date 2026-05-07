@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import { Link } from "react-router-dom";
 import { auth, googleProvider } from "../lib/firebase";
+import { useLanguage } from "../lib/language";
 import { getSubmissions, updateSubmissionDate } from "../lib/submissions";
 import type { Submission } from "../types";
 
@@ -12,6 +13,7 @@ interface Profile {
 }
 
 export default function MyPage() {
+  const { t } = useLanguage();
   const [profile, setProfile] = useState<Profile | null>(() => readProfile());
   const [showLoginMethods, setShowLoginMethods] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
@@ -111,17 +113,13 @@ export default function MyPage() {
   const carriers = submissions.filter((submission) => submission.type === "carrier");
 
   return (
-    <section className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
+    <section className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
       {!profile ? (
-        <div className="rounded-[32px] border border-white/10 bg-[#1f2232]/90 p-6 shadow-2xl">
-          <p className="text-sm font-bold text-slate-300">
-            <span className="block">我的</span>
-            <span className="mt-1 block text-slate-400">My</span>
-          </p>
-          <h1 className="mt-4 text-5xl font-black text-white">My</h1>
-          <p className="mt-4 leading-7 text-slate-300">
-            <span className="block">登录后查看个人资料、发布记录与交易协商入口。</span>
-            <span className="block text-slate-400">Log in to view your profile, posts, and negotiation entry points.</span>
+        <div className="rounded-[26px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
+          <p className="text-xs font-bold text-slate-400">Profile</p>
+          <h1 className="mt-2 text-3xl font-black text-white">{t("My account", "我的")}</h1>
+          <p className="mt-2 text-sm leading-6 text-slate-300">
+            {t("Log in to view your profile, posts, and negotiation entry points.", "登录后查看个人资料、发布记录与交易协商入口。")}
           </p>
         </div>
       ) : null}
@@ -135,14 +133,14 @@ export default function MyPage() {
                   to="/register"
                   className="pressable flex min-h-14 items-center justify-center rounded-2xl bg-[#38bdf8] px-3 text-center text-sm font-black text-white"
                 >
-                  注册 / Register
+                  {t("Register", "注册")}
                 </Link>
                 <button
                   type="button"
                   onClick={() => setShowLoginMethods(true)}
                   className="pressable min-h-14 rounded-2xl border border-white/15 bg-white/10 px-3 text-sm font-black text-white"
                 >
-                  Log in / 登录
+                  {t("Log in", "登录")}
                 </button>
               </div>
             ) : (
@@ -155,10 +153,9 @@ export default function MyPage() {
                   }}
                   className="pressable mb-5 rounded-2xl border border-white/15 bg-white/10 px-4 py-2 text-xs font-bold text-slate-300"
                 >
-                  ← 返回 / Back
+                  ← {t("Back", "返回")}
                 </button>
-                <h2 className="text-xl font-black text-white">登录方式</h2>
-                <p className="mt-1 text-sm text-slate-400">Login methods</p>
+                <h2 className="text-xl font-black text-white">{t("Login methods", "登录方式")}</h2>
                 {!showEmailForm ? (
                   <div className="stagger-in mt-5 grid gap-3">
                     <button
@@ -166,14 +163,14 @@ export default function MyPage() {
                       onClick={() => setShowEmailForm(true)}
                       className="pressable min-h-14 rounded-2xl border border-white/15 bg-white/10 px-3 text-sm font-black text-white"
                     >
-                      邮箱登录 / Email
+                      {t("Email login", "邮箱登录")}
                     </button>
                     <button
                       type="button"
                       onClick={() => void handleGmailLogin()}
                       className="pressable min-h-14 rounded-2xl bg-[#38bdf8] px-3 text-sm font-black text-white"
                     >
-                      Gmail 登录 / Gmail
+                      {t("Gmail login", "Gmail 登录")}
                     </button>
                   </div>
                 ) : (
@@ -183,10 +180,10 @@ export default function MyPage() {
                       onClick={() => setShowEmailForm(false)}
                       className="pressable w-fit rounded-2xl border border-white/15 bg-white/10 px-4 py-2 text-xs font-bold text-slate-300"
                     >
-                      ← 返回 / Back
+                      ← {t("Back", "返回")}
                     </button>
                     <label className="block">
-                      <span className="text-sm font-semibold text-slate-100">邮箱 / Email</span>
+                      <span className="text-sm font-semibold text-slate-100">{t("Email", "邮箱")}</span>
                       <input
                         type="email"
                         required
@@ -196,7 +193,7 @@ export default function MyPage() {
                       />
                     </label>
                     <label className="block">
-                      <span className="text-sm font-semibold text-slate-100">密码 / Password</span>
+                      <span className="text-sm font-semibold text-slate-100">{t("Password", "密码")}</span>
                       <input
                         type="password"
                         required
@@ -210,7 +207,7 @@ export default function MyPage() {
                       type="submit"
                       className="pressable min-h-14 rounded-2xl bg-[#38bdf8] px-3 text-sm font-black text-white"
                     >
-                      登录 / Continue
+                      {t("Continue", "继续")}
                     </button>
                   </form>
                 )}
@@ -240,7 +237,7 @@ export default function MyPage() {
                 onClick={logout}
                 className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-bold text-white"
               >
-                退出 / Log out
+                {t("Log out", "退出")}
               </button>
             </div>
           </div>

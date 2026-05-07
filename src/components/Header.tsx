@@ -1,5 +1,6 @@
 import { Link, NavLink } from "react-router-dom";
 import { MessageCircle, PackageCheck } from "lucide-react";
+import { useLanguage } from "../lib/language";
 
 const navItems = [
   { to: "/", label: "Home" },
@@ -9,6 +10,8 @@ const navItems = [
 ];
 
 export default function Header() {
+  const { language, setLanguage } = useLanguage();
+
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 bg-[#050918]/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
@@ -25,6 +28,22 @@ export default function Header() {
         >
           <MessageCircle size={19} aria-hidden="true" />
         </Link>
+        <div className="flex rounded-2xl border border-white/10 bg-white/5 p-1 text-xs font-black">
+          <button
+            type="button"
+            onClick={() => setLanguage("en")}
+            className={`rounded-xl px-2.5 py-1.5 transition ${language === "en" ? "bg-[#38bdf8] text-white" : "text-slate-400"}`}
+          >
+            EN
+          </button>
+          <button
+            type="button"
+            onClick={() => setLanguage("zh")}
+            className={`rounded-xl px-2.5 py-1.5 transition ${language === "zh" ? "bg-[#38bdf8] text-white" : "text-slate-400"}`}
+          >
+            中文
+          </button>
+        </div>
         <nav className="hidden flex-wrap items-center justify-end gap-1 text-sm sm:flex">
           {navItems.map((item) => (
             <NavLink

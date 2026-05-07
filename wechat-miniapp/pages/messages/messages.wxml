@@ -1,0 +1,60 @@
+<view class="page">
+  <view class="hero">
+    <view class="eyebrow">
+      <text class="cn">协商消息</text>
+      <text class="en">Message</text>
+    </view>
+    <view class="title">Message</view>
+    <view class="subtitle">
+      <text class="cn">用于双方确认价格、地点、时间和交接细节。</text>
+      <text class="en">A space for both sides to confirm price, place, timing, and handoff details.</text>
+    </view>
+  </view>
+
+  <view class="message-carousel">
+    <view class="message-stage">
+      <view
+        wx:for="{{displayCards}}"
+        wx:key="titleEn"
+        class="message-tip pos-{{item.position}}"
+      >
+        <view class="tip-title">{{item.titleCn}}</view>
+        <view class="tip-en">{{item.titleEn}}</view>
+        <view class="tip-body">{{item.bodyCn}}</view>
+        <view class="tip-body muted">{{item.bodyEn}}</view>
+      </view>
+    </view>
+    <view class="dots">
+      <view
+        wx:for="{{cards}}"
+        wx:key="titleEn"
+        data-index="{{index}}"
+        bindtap="setCard"
+        class="{{activeCard === index ? 'dot active-dot-mini' : 'dot'}}"
+      ></view>
+    </view>
+  </view>
+
+  <block wx:if="{{conversations.length}}">
+    <view class="message-row" wx:for="{{conversations}}" wx:key="id" data-id="{{item.id}}" bindtap="openChat">
+      <view class="unread-dot" wx:if="{{item.unread}}"></view>
+      <view class="avatar">{{item.otherUserInitial || "P"}}</view>
+      <view class="message-main">
+        <view class="message-head">
+          <text class="message-name">{{item.otherUserName}}</text>
+          <text class="message-time">{{item.latestTime}}</text>
+        </view>
+        <view class="message-item">{{item.item}} · {{item.route}}</view>
+        <view class="message-preview">{{item.latestPreview}}</view>
+      </view>
+      <view class="reward-badge">{{item.reward}}</view>
+    </view>
+  </block>
+
+  <view class="card empty-state" wx:else>
+    <view class="row-title">暂无消息</view>
+    <view class="row-subtitle">No messages yet</view>
+    <view class="item-note">当你联系订单发布者后，对话会显示在这里。</view>
+    <view class="item-note muted">Conversations will appear here after you contact a post owner.</view>
+  </view>
+</view>

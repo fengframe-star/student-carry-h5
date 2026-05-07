@@ -70,7 +70,7 @@ export async function createRequestSubmission(data: RequestInput) {
       ...data,
       id: `${Date.now()}`,
       type: "request",
-      status: "New",
+      status: "Open",
       publishedDate: today(),
       createdAt: new Date(),
     });
@@ -80,7 +80,7 @@ export async function createRequestSubmission(data: RequestInput) {
   await addDoc(collection(requireDb(), collectionName), {
     ...data,
     type: "request",
-    status: "New",
+    status: "Open",
     publishedDate: new Date().toISOString().slice(0, 10),
     createdAt: serverTimestamp(),
   });
@@ -92,7 +92,7 @@ export async function createCarrierSubmission(data: CarrierInput) {
       ...data,
       id: `${Date.now()}`,
       type: "carrier",
-      status: "New",
+      status: "Open",
       publishedDate: today(),
       createdAt: new Date(),
     });
@@ -102,7 +102,7 @@ export async function createCarrierSubmission(data: CarrierInput) {
   await addDoc(collection(requireDb(), collectionName), {
     ...data,
     type: "carrier",
-    status: "New",
+    status: "Open",
     publishedDate: new Date().toISOString().slice(0, 10),
     createdAt: serverTimestamp(),
   });

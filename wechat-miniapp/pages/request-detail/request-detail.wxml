@@ -1,0 +1,34 @@
+<view class="page detail-page">
+  <button class="back-button" bindtap="goBack">← 返回 / Back</button>
+
+  <view class="card" wx:if="{{request}}">
+    <view class="eyebrow">帮我带 / Request detail</view>
+    <view class="title compact-title">{{request.itemName || "Item"}}</view>
+    <view class="route-title">{{request.fromLocation || "From"}} → {{request.toLocation || "To"}}</view>
+    <view class="detail-grid">
+      <view class="detail-cell">
+        <view class="detail-label">Expected delivery</view>
+        <view class="detail-value">{{request.desiredDeliveryDate || "TBD"}}</view>
+      </view>
+      <view class="detail-cell">
+        <view class="detail-label">Budget</view>
+        <view class="detail-value">€{{request.budgetEur || 0}}</view>
+      </view>
+      <view class="detail-cell">
+        <view class="detail-label">Estimated value</view>
+        <view class="detail-value">€{{request.estimatedValueEur || 0}}</view>
+      </view>
+      <view class="detail-cell">
+        <view class="detail-label">China domestic shipping</view>
+        <view class="detail-value">{{request.chinaDomesticShipping || "Not sure"}}</view>
+      </view>
+    </view>
+    <view class="item-note" wx:if="{{request.notes}}">{{request.notes}}</view>
+  </view>
+
+  <view class="card muted" wx:else>This request could not be found.</view>
+
+  <view class="contact-bar">
+    <button class="primary-button contact-button" bindtap="contactNow">立即联系 / Contact Now</button>
+  </view>
+</view>

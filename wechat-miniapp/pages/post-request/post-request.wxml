@@ -50,6 +50,12 @@
         <input class="input" name="itemName" placeholder="课本 / Textbook" />
       </view>
       <view class="field">
+        <text class="label">物品分类\nItem category</text>
+        <picker value="{{itemCategoryIndex}}" range="{{itemCategories}}" bindchange="onItemCategoryChange">
+          <view class="picker">{{itemCategories[itemCategoryIndex]}}</view>
+        </picker>
+      </view>
+      <view class="field">
         <text class="label">预估价值 EUR\nEstimated value in EUR</text>
         <input class="input" name="estimatedValueEur" type="digit" placeholder="50" />
       </view>
@@ -76,17 +82,44 @@
     </view>
 
     <view class="notice">
-      <text class="cn">MVP 阶段不收集护照号码或身份证件。</text>
-      <text class="en">We do not collect passport numbers or ID documents at MVP stage.</text>
-      <text class="cn">后续身份验证可能通过可信第三方服务完成。</text>
-      <text class="en">Identity verification may be introduced later through a trusted third-party provider.</text>
+      <text class="cn">禁止危险品、武器、非法物质、受限制电池、大容量液体、灰产代购或转售物品。</text>
+      <text class="en">Dangerous goods, weapons, illegal substances, restricted batteries, large liquids, and gray-market reselling items are not allowed.</text>
+      <text class="cn">如需中国国内转寄，可在聊天中沟通顺丰匿名寄件与运单信息。</text>
+      <text class="en">If domestic forwarding in China is needed, SF anonymous shipping and tracking details can be discussed in chat.</text>
     </view>
 
     <label class="checkbox-row">
       <checkbox value="confirmed" checked="{{confirmed}}" bindtap="toggleConfirmed" />
-      <text>我确认该物品不是限制、违法、奢侈、高价值或身份证件类物品。\nI confirm this is not a restricted, illegal, luxury, high-value, or identity document item.</text>
+      <text>我确认该物品不是限制、违法、奢侈、高价值或身份证件类物品，并符合出发地、航空公司与目的地国家/地区规定。\nI confirm this is not a restricted, illegal, luxury, high-value, or identity document item and complies with airline, customs, and destination regulations.</text>
     </label>
 
-    <button class="primary-button submit-button" form-type="submit">提交并支付 / Submit and pay</button>
+    <button class="primary-button submit-button" form-type="submit">查看匹配建议 / Review matching carriers</button>
   </form>
+
+  <view class="match-section" wx:if="{{showingMatches}}">
+    <view class="card">
+      <view class="item-title">可能匹配的顺路送</view>
+      <view class="item-line">Possible matching carry posts</view>
+
+      <block wx:if="{{matchingCarriers.length}}">
+        <view class="mini-card" wx:for="{{matchingCarriers}}" wx:key="_id">
+          <view class="mini-row">
+            <view class="mini-route">{{item.travelRoute}}</view>
+            <view class="status-badge">{{item.status || "Open"}}</view>
+          </view>
+          <view class="mini-main">{{item.availableLuggageSpace}}</view>
+          <view class="mini-line">{{item.travelDate}} · {{item.expectedReward}}</view>
+          <view class="mini-line">Completed: 5 · Active today</view>
+        </view>
+      </block>
+
+      <view class="notice compact-notice" wx:else>
+        <text class="cn">暂时没有明显匹配的顺路送。</text>
+        <text class="en">No strong carry matches yet.</text>
+      </view>
+
+      <button class="primary-button submit-button" wx:if="{{matchingCarriers.length}}" bindtap="contactMatchingCarrier">Contact Matching Carrier</button>
+      <button class="secondary-button submit-button" bindtap="publishPendingRequest">Still Publish Request</button>
+    </view>
+  </view>
 </view>

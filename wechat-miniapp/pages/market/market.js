@@ -20,6 +20,7 @@ Page({
     toCityIndex: 0,
     allRequests: [],
     allCarriers: [],
+    allPosts: [],
     requests: [],
     carriers: []
   },
@@ -30,6 +31,23 @@ Page({
 
   setType(event) {
     this.setData({ activeType: event.currentTarget.dataset.type });
+  },
+
+  goRequestDetail(event) {
+    wx.navigateTo({ url: `/pages/request-detail/request-detail?id=${event.currentTarget.dataset.id}` });
+  },
+
+  goCarryDetail(event) {
+    wx.navigateTo({ url: `/pages/carry-detail/carry-detail?id=${event.currentTarget.dataset.id}` });
+  },
+
+  goPostDetail(event) {
+    const { id, type } = event.currentTarget.dataset;
+    wx.navigateTo({
+      url: type === "request"
+        ? `/pages/request-detail/request-detail?id=${id}`
+        : `/pages/carry-detail/carry-detail?id=${id}`
+    });
   },
 
   onFromCountryChange(event) {
@@ -82,13 +100,17 @@ Page({
     const toCountry = this.data.searchCountries[this.data.toCountryIndex];
     const toCity = this.data.toCityOptions[this.data.toCityIndex];
 
+    const requests = this.data.allRequests.filter((item) =>
+      routeMatchesFilters(`${item.fromLocation} ${item.toLocation}`, fromCountry, fromCity, toCountry, toCity)
+    );
+    const carriers = this.data.allCarriers.filter((item) =>
+      routeMatchesFilters(item.travelRoute, fromCountry, fromCity, toCountry, toCity)
+    );
+
     this.setData({
-      requests: this.data.allRequests.filter((item) =>
-        routeMatchesFilters(`${item.fromLocation} ${item.toLocation}`, fromCountry, fromCity, toCountry, toCity)
-      ),
-      carriers: this.data.allCarriers.filter((item) =>
-        routeMatchesFilters(item.travelRoute, fromCountry, fromCity, toCountry, toCity)
-      )
+      requests,
+      carriers,
+      allPosts: [...requests, ...carriers].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
     });
   },
 
@@ -104,7 +126,11 @@ Page({
           toLocation: item.toLocation || "To",
           itemName: item.itemName || "Item",
           desiredDeliveryDate: item.desiredDeliveryDate || "Date pending",
-          budgetEur: item.budgetEur || 0
+          budgetEur: item.budgetEur || 0,
+          displayRoute: `${item.fromLocation || "From"} → ${item.toLocation || "To"}`,
+          displayMain: item.itemName || "Item",
+          displayMeta: `${item.itemCategory || "Others"} · ${item.desiredDeliveryDate || "Date pending"}`,
+          displayReward: `€${item.budgetEur || 0}`
         }));
       const allCarriers = submissions
         .filter((item) => item.type === "carrier")
@@ -113,12 +139,17 @@ Page({
           travelRoute: item.travelRoute || "Route pending",
           availableLuggageSpace: item.availableLuggageSpace || "Space pending",
           travelDate: item.travelDate || "Date pending",
-          expectedReward: item.expectedReward || "Reward pending"
+          expectedReward: item.expectedReward || "Reward pending",
+          displayRoute: item.travelRoute || "Route pending",
+          displayMain: item.availableLuggageSpace || "Space pending",
+          displayMeta: `${item.travelDate || "Date pending"} · ${(item.acceptedItemTypes || ["Flexible"]).join ? (item.acceptedItemTypes || ["Flexible"]).join(", ") : item.acceptedItemTypes || "Flexible"}`,
+          displayReward: item.expectedReward || "Reward pending"
         }));
 
       this.setData({
         allRequests,
-        allCarriers
+        allCarriers,
+        allPosts: []
       });
       this.applyFilters();
     } catch (error) {

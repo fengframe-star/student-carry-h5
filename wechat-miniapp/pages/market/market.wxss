@@ -5,11 +5,28 @@
 }
 
 .market-button {
-  width: calc((100% - 14rpx) / 2);
-  flex: 0 0 calc((100% - 14rpx) / 2);
+  width: calc((100% - 28rpx) / 3);
+  flex: 0 0 calc((100% - 28rpx) / 3);
   min-width: 0;
   padding-left: 10rpx;
   padding-right: 10rpx;
+}
+
+.mini-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10rpx;
+}
+
+.status-badge {
+  flex-shrink: 0;
+  border-radius: 999rpx;
+  background: rgba(56, 189, 248, 0.15);
+  padding: 6rpx 12rpx;
+  color: #e0f2fe;
+  font-size: 18rpx;
+  font-weight: 900;
 }
 
 .search-card {

@@ -1,10 +1,10 @@
 <view class="page">
-  <view class="hero">
+  <view class="hero" wx:if="{{!loggedIn}}">
     <view class="eyebrow">
       <text class="cn">我的</text>
-      <text class="en">My account</text>
+      <text class="en">My</text>
     </view>
-    <view class="title">我的</view>
+    <view class="title">My</view>
     <view class="subtitle">
       <text class="cn">注册、登录，并管理你发布的帮我带和顺路送。</text>
       <text class="en">Register, log in, and manage your own request or carry posts.</text>
@@ -24,8 +24,6 @@
         <button class="login-button" bindtap="loginDemo">邮箱登录\nEmail</button>
         <button class="login-button" bindtap="loginDemo">Google 登录\nGoogle</button>
         <button class="login-button" bindtap="loginDemo">微信登录\nWeChat</button>
-        <button class="login-button" bindtap="loginDemo">Apple ID 登录\nApple ID</button>
-        <button class="login-button" bindtap="loginDemo">支付宝登录\nAlipay</button>
       </view>
     </view>
 

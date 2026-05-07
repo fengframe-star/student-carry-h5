@@ -6,11 +6,14 @@ import {
   appendConversationMessage,
   getConversation,
   markConversationRead,
+  updateConversationStatus,
   type Conversation,
 } from "../lib/conversations";
+import { useLanguage } from "../lib/language";
 
 export default function ChatDetailPage() {
   const { conversationId } = useParams();
+  const { t } = useLanguage();
   const [conversation, setConversation] = useState<Conversation | null>(() =>
     conversationId ? getConversation(conversationId) : null,
   );
@@ -43,13 +46,19 @@ export default function ChatDetailPage() {
     return <Navigate to="/messages" replace />;
   }
 
+  const isMatched = conversation.status === "Matched";
+  const actionLabel =
+    conversation.postType === "request"
+      ? t("Accept Request", "接单")
+      : t("Confirm Match", "同意合作");
+
   return (
     <section className="mx-auto flex min-h-[calc(100vh-132px)] max-w-3xl flex-col px-4 py-6 sm:px-6 sm:py-8">
       <BackButton fallback="/messages" />
       <div className="sticky top-0 z-10 rounded-[28px] border border-sky-300/20 bg-[#1f2232]/95 p-4 shadow-2xl backdrop-blur">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-bold text-slate-400">Transaction</p>
+            <p className="text-xs font-bold text-slate-400">{t("Transaction", "交易")}</p>
             <h1 className="mt-1 text-xl font-black text-white">{conversation.item}</h1>
             <p className="mt-2 text-sm font-semibold text-slate-300">{conversation.route}</p>
           </div>
@@ -58,11 +67,19 @@ export default function ChatDetailPage() {
           </span>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-slate-300 sm:grid-cols-4">
-          <span className="rounded-2xl bg-white/[0.06] px-3 py-2">Item: {conversation.item}</span>
-          <span className="rounded-2xl bg-white/[0.06] px-3 py-2">Reward: {conversation.reward}</span>
-          <span className="rounded-2xl bg-white/[0.06] px-3 py-2">Location: TBD</span>
-          <span className="rounded-2xl bg-white/[0.06] px-3 py-2">Time: TBD</span>
+          <span className="rounded-2xl bg-white/[0.06] px-3 py-2">{t("Item", "物品")}: {conversation.item}</span>
+          <span className="rounded-2xl bg-white/[0.06] px-3 py-2">{t("Reward", "报酬")}: {conversation.reward}</span>
+          <span className="rounded-2xl bg-white/[0.06] px-3 py-2">{t("Location", "地点")}: TBD</span>
+          <span className="rounded-2xl bg-white/[0.06] px-3 py-2">{t("Time", "时间")}: TBD</span>
         </div>
+        <button
+          type="button"
+          disabled={isMatched}
+          onClick={() => setConversation(updateConversationStatus(conversation.id, "Matched"))}
+          className="pressable mt-4 w-full rounded-2xl bg-[#38bdf8] px-4 py-3 text-sm font-black text-white disabled:bg-white/10 disabled:text-slate-400"
+        >
+          {isMatched ? t("Matched", "已匹配") : actionLabel}
+        </button>
       </div>
 
       <div className="flex-1 space-y-4 py-6">

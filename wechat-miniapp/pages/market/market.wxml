@@ -9,6 +9,7 @@
     <view class="market-actions">
       <button class="{{activeType === 'request' ? 'primary-button market-button' : 'secondary-button market-button'}}" data-type="request" bindtap="setType">帮我带</button>
       <button class="{{activeType === 'carrier' ? 'primary-button market-button' : 'secondary-button market-button'}}" data-type="carrier" bindtap="setType">顺路送</button>
+      <button class="{{activeType === 'all' ? 'primary-button market-button' : 'secondary-button market-button'}}" data-type="all" bindtap="setType">All</button>
     </view>
   </view>
 
@@ -36,12 +37,40 @@
     </view>
   </view>
 
+  <view class="grid-list" wx:if="{{activeType === 'all'}}">
+    <view
+      class="mini-card"
+      wx:for="{{allPosts}}"
+      wx:key="_id"
+      data-id="{{item._id}}"
+      data-type="{{item.type}}"
+      bindtap="goPostDetail"
+    >
+      <view class="mini-row">
+        <view class="mini-route">{{item.displayRoute}}</view>
+        <view class="status-badge">{{item.status || "Open"}}</view>
+      </view>
+      <view class="mini-main">{{item.displayMain}}</view>
+      <view class="mini-line">{{item.displayMeta}}</view>
+      <view class="mini-price">{{item.displayReward}}</view>
+      <view class="mini-line">Completed: 5 · Active today</view>
+    </view>
+  </view>
+  <view class="card muted" wx:if="{{activeType === 'all' && !allPosts.length}}">
+    暂无发布
+    <text class="en">No posts yet.</text>
+  </view>
+
   <view class="grid-list" wx:if="{{activeType === 'request'}}">
-    <view class="mini-card" wx:for="{{requests}}" wx:key="_id">
-      <view class="mini-route">{{item.fromLocation}} → {{item.toLocation}}</view>
+    <view class="mini-card" wx:for="{{requests}}" wx:key="_id" data-id="{{item._id}}" bindtap="goRequestDetail">
+      <view class="mini-row">
+        <view class="mini-route">{{item.fromLocation}} → {{item.toLocation}}</view>
+        <view class="status-badge">{{item.status || "Open"}}</view>
+      </view>
       <view class="mini-main">{{item.itemName}}</view>
-      <view class="mini-line">{{item.desiredDeliveryDate}}</view>
+      <view class="mini-line">{{item.itemCategory || "Others"}} · {{item.desiredDeliveryDate}}</view>
       <view class="mini-price">€{{item.budgetEur}}</view>
+      <view class="mini-line">Completed: 5 · Active today</view>
     </view>
   </view>
   <view class="card muted" wx:if="{{activeType === 'request' && !requests.length}}">
@@ -50,11 +79,15 @@
   </view>
 
   <view class="grid-list" wx:if="{{activeType === 'carrier'}}">
-    <view class="mini-card" wx:for="{{carriers}}" wx:key="_id">
-      <view class="mini-route">{{item.travelRoute}}</view>
+    <view class="mini-card" wx:for="{{carriers}}" wx:key="_id" data-id="{{item._id}}" bindtap="goCarryDetail">
+      <view class="mini-row">
+        <view class="mini-route">{{item.travelRoute}}</view>
+        <view class="status-badge">{{item.status || "Open"}}</view>
+      </view>
       <view class="mini-main">{{item.availableLuggageSpace}}</view>
-      <view class="mini-line">{{item.travelDate}}</view>
+      <view class="mini-line">{{item.travelDate}} · {{item.acceptedItemTypes || "Flexible"}}</view>
       <view class="mini-price">{{item.expectedReward}}</view>
+      <view class="mini-line">Completed: 5 · Active today</view>
     </view>
   </view>
   <view class="card muted" wx:if="{{activeType === 'carrier' && !carriers.length}}">

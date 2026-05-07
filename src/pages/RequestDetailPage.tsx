@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { MessageCircle } from "lucide-react";
 import BackButton from "../components/BackButton";
 import { createOrOpenConversation } from "../lib/conversations";
+import { reputationFor } from "../lib/matching";
 import { getSubmissions } from "../lib/submissions";
 import type { RequestSubmission } from "../types";
 
@@ -37,13 +38,22 @@ export default function RequestDetailPage() {
         ) : request ? (
           <>
             <h1 className="mt-4 text-4xl font-black text-white">{request.itemName || "Item"}</h1>
-            <p className="mt-4 text-lg font-black text-sky-200">
-              {request.fromLocation || "From"} → {request.toLocation || "To"}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <p className="text-lg font-black text-sky-200">
+                {request.fromLocation || "From"} → {request.toLocation || "To"}
+              </p>
+              <span className="rounded-full bg-sky-400/15 px-3 py-1 text-xs font-black text-sky-100">
+                {request.status || "Open"}
+              </span>
+            </div>
+            <p className="mt-4 rounded-[22px] border border-white/10 bg-white/[0.06] p-4 text-sm leading-6 text-slate-300">
+              Completed: {reputationFor(0).completed} · {reputationFor(0).active} · {reputationFor(0).responseSpeed}
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <DetailLine label="Expected delivery" value={request.desiredDeliveryDate || "TBD"} />
               <DetailLine label="Budget" value={`€${request.budgetEur || 0}`} />
               <DetailLine label="Estimated value" value={`€${request.estimatedValueEur || 0}`} />
+              <DetailLine label="Item category" value={request.itemCategory || "Others"} />
               <DetailLine label="China domestic shipping" value={request.chinaDomesticShipping || "Not sure"} />
             </div>
             {request.notes ? (

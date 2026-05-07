@@ -275,6 +275,83 @@ picker {
   font-size: 44rpx;
 }
 
+.item-title {
+  margin-top: 14rpx;
+  color: #ffffff;
+  font-size: 32rpx;
+  font-weight: 800;
+}
+
+.item-line {
+  margin-top: 10rpx;
+  color: #aeb6d9;
+  font-size: 26rpx;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.item-note {
+  margin-top: 18rpx;
+  color: #c5c9d8;
+  font-size: 24rpx;
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.match-section {
+  margin-top: 28rpx;
+}
+
+.mini-card {
+  min-width: 0;
+  box-sizing: border-box;
+  margin-top: 18rpx;
+  padding: 22rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  border-radius: 28rpx;
+  background: rgba(16, 20, 34, 0.72);
+}
+
+.mini-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10rpx;
+}
+
+.mini-route {
+  color: #aeb6d9;
+  font-size: 22rpx;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.mini-main {
+  margin-top: 14rpx;
+  color: #ffffff;
+  font-size: 28rpx;
+  font-weight: 800;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.mini-line {
+  margin-top: 14rpx;
+  color: #c5c9d8;
+  font-size: 24rpx;
+  word-break: break-word;
+}
+
+.status-badge {
+  flex-shrink: 0;
+  border-radius: 999rpx;
+  background: rgba(56, 189, 248, 0.15);
+  padding: 6rpx 12rpx;
+  color: #e0f2fe;
+  font-size: 18rpx;
+  font-weight: 900;
+}
+
 @media (prefers-color-scheme: light) {
   page {
     background: #f7f8fc;

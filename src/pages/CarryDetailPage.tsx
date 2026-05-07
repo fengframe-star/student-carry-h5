@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { MessageCircle } from "lucide-react";
 import BackButton from "../components/BackButton";
 import { createOrOpenConversation } from "../lib/conversations";
+import { reputationFor } from "../lib/matching";
 import { getSubmissions } from "../lib/submissions";
 import type { CarrierSubmission } from "../types";
 
@@ -37,14 +38,23 @@ export default function CarryDetailPage() {
         ) : carry ? (
           <>
             <h1 className="mt-4 text-4xl font-black text-white">{carry.travelRoute || "Route pending"}</h1>
-            <p className="mt-4 text-lg font-black text-sky-200">
-              {carry.availableLuggageSpace || "Available luggage space"}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <p className="text-lg font-black text-sky-200">
+                {carry.availableLuggageSpace || "Available luggage space"}
+              </p>
+              <span className="rounded-full bg-sky-400/15 px-3 py-1 text-xs font-black text-sky-100">
+                {carry.status || "Open"}
+              </span>
+            </div>
+            <p className="mt-4 rounded-[22px] border border-white/10 bg-white/[0.06] p-4 text-sm leading-6 text-slate-300">
+              Completed: {reputationFor(1).completed} · {reputationFor(1).active} · {reputationFor(1).responseSpeed}
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <DetailLine label="Travel date" value={carry.travelDate || "TBD"} />
               <DetailLine label="Expected reward" value={carry.expectedReward || "Reward pending"} />
               <DetailLine label="Status" value={carry.status || "New"} />
               <DetailLine label="Published" value={carry.publishedDate || "TBD"} />
+              <DetailLine label="Accepted item types" value={carry.acceptedItemTypes?.join(", ") || "Flexible"} />
             </div>
             {carry.notes ? (
               <div className="mt-5 rounded-[24px] border border-white/10 bg-white/[0.06] p-4">

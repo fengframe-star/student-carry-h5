@@ -52,6 +52,12 @@
         </picker>
       </view>
       <view class="field">
+        <text class="label">可接受物品类型\nAccepted item type</text>
+        <picker value="{{itemCategoryIndex}}" range="{{itemCategories}}" bindchange="onItemCategoryChange">
+          <view class="picker">{{itemCategories[itemCategoryIndex]}}</view>
+        </picker>
+      </view>
+      <view class="field">
         <text class="label">可用行李空间\nAvailable luggage space</text>
         <input class="input" name="availableLuggageSpace" placeholder="3 kg / shoebox size" />
       </view>
@@ -66,17 +72,42 @@
     </view>
 
     <view class="notice">
-      <text class="cn">MVP 阶段不收集护照号码或身份证件。</text>
-      <text class="en">We do not collect passport numbers or ID documents at MVP stage.</text>
-      <text class="cn">后续身份验证可能通过可信第三方服务完成。</text>
-      <text class="en">Identity verification may be introduced later through a trusted third-party provider.</text>
+      <text class="cn">禁止危险品、武器、非法物质、受限制电池、大容量液体、灰产代购或转售物品。</text>
+      <text class="en">Dangerous goods, weapons, illegal substances, restricted batteries, large liquids, and gray-market reselling items are not allowed.</text>
     </view>
 
     <label class="checkbox-row">
       <checkbox value="agreed" checked="{{agreed}}" bindtap="toggleAgreed" />
-      <text>我同意遵守平台规则，并了解后续可能需要押金。\nI agree to follow platform rules and may be asked for a deposit.</text>
+      <text>我同意遵守平台规则，并确认物品需符合出发地、航空公司与目的地国家/地区规定。\nI agree to follow platform rules and confirm items must comply with airline, customs, and destination regulations.</text>
     </label>
 
-    <button class="primary-button submit-button" form-type="submit">提交行程 / Submit travel details</button>
+    <button class="primary-button submit-button" form-type="submit">查看匹配建议 / Review matching requests</button>
   </form>
+
+  <view class="match-section" wx:if="{{showingMatches}}">
+    <view class="card">
+      <view class="item-title">可能匹配的帮我带</view>
+      <view class="item-line">Possible matching requests</view>
+
+      <block wx:if="{{matchingRequests.length}}">
+        <view class="mini-card" wx:for="{{matchingRequests}}" wx:key="_id">
+          <view class="mini-row">
+            <view class="mini-route">{{item.fromLocation}} → {{item.toLocation}}</view>
+            <view class="status-badge">{{item.status || "Open"}}</view>
+          </view>
+          <view class="mini-main">{{item.itemName}}</view>
+          <view class="mini-line">{{item.itemCategory || "Others"}} · {{item.desiredDeliveryDate}}</view>
+          <view class="mini-line">€{{item.budgetEur}} · Completed: 5 · Active today</view>
+        </view>
+      </block>
+
+      <view class="notice compact-notice" wx:else>
+        <text class="cn">暂时没有明显匹配的帮我带。</text>
+        <text class="en">No strong request matches yet.</text>
+      </view>
+
+      <button class="primary-button submit-button" wx:if="{{matchingRequests.length}}" bindtap="contactRequestUser">Contact Request User</button>
+      <button class="secondary-button submit-button" bindtap="publishPendingCarry">Still Publish Carry Post</button>
+    </view>
+  </view>
 </view>

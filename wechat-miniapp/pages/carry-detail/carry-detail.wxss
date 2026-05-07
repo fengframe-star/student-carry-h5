@@ -1,0 +1,58 @@
+.detail-page {
+  padding-bottom: 150rpx;
+}
+
+.compact-title {
+  font-size: 42rpx;
+}
+
+.route-title {
+  margin-top: 18rpx;
+  color: #bae6fd;
+  font-size: 30rpx;
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14rpx;
+  margin-top: 28rpx;
+}
+
+.detail-cell {
+  padding: 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.detail-label {
+  color: #7f89a6;
+  font-size: 22rpx;
+  font-weight: 800;
+}
+
+.detail-value {
+  margin-top: 10rpx;
+  color: #ffffff;
+  font-size: 24rpx;
+  font-weight: 900;
+}
+
+.contact-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  box-sizing: border-box;
+  padding: 18rpx 28rpx calc(env(safe-area-inset-bottom) + 22rpx);
+  border-top: 1rpx solid rgba(255, 255, 255, 0.08);
+  background: rgba(5, 9, 24, 0.9);
+}
+
+.contact-button {
+  width: 100%;
+}

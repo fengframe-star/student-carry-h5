@@ -109,3 +109,18 @@ export function appendConversationMessage(id: string, text: string) {
   writeConversations(next);
   return next.find((conversation) => conversation.id === id) ?? null;
 }
+
+export function updateConversationStatus(id: string, status: string) {
+  const conversations = getConversations();
+  const next = conversations.map((conversation) =>
+    conversation.id === id
+      ? {
+          ...conversation,
+          status,
+        }
+      : conversation,
+  );
+
+  writeConversations(next);
+  return next.find((conversation) => conversation.id === id) ?? null;
+}

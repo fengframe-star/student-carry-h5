@@ -1,4 +1,4 @@
-const { addSubmission } = require("../../utils/storage");
+const { addSubmission, createOrOpenConversation, getSubmissions } = require("../../utils/storage");
 const { countryNames, getCities } = require("../../utils/cities");
 
 Page({
@@ -10,10 +10,15 @@ Page({
     toCountryIndex: 1,
     toCityOptions: getCities(countryNames[1]),
     toCityIndex: 0,
+    itemCategories: ["Documents", "Clothes", "Cosmetics", "Electronics", "Gifts", "Food", "Medicine (restricted)", "Others"],
+    itemCategoryIndex: 0,
     shippingOptions: ["Yes / 是", "No / 否", "Not sure / 不确定"],
     shippingIndex: 2,
     desiredDeliveryDate: "",
-    confirmed: false
+    confirmed: false,
+    matchingCarriers: [],
+    pendingSubmission: null,
+    showingMatches: false
   },
 
   goBack() {
@@ -52,6 +57,10 @@ Page({
 
   onDeliveryDateChange(event) {
     this.setData({ desiredDeliveryDate: event.detail.value });
+  },
+
+  onItemCategoryChange(event) {
+    this.setData({ itemCategoryIndex: Number(event.detail.value) });
   },
 
   onShippingChange(event) {
@@ -101,29 +110,59 @@ Page({
       return;
     }
 
+    const submission = {
+      type: "request",
+      name: values.name,
+      contact: "Platform messaging",
+      fromLocation: this.data.fromCityOptions[this.data.fromCityIndex],
+      toLocation: this.data.toCityOptions[this.data.toCityIndex],
+      itemName: values.itemName,
+      itemCategory: this.data.itemCategories[this.data.itemCategoryIndex],
+      estimatedValueEur: Number(values.estimatedValueEur),
+      desiredDeliveryDate: this.data.desiredDeliveryDate,
+      budgetEur: Number(values.budgetEur),
+      chinaDomesticShipping: this.data.shippingOptions[this.data.shippingIndex],
+      notes: values.notes || "",
+      confirmation: true
+    };
+
+    wx.showLoading({ title: "Matching" });
+    try {
+      const submissions = await getSubmissions();
+      const matchingCarriers = submissions
+        .filter((item) => item.type === "carrier")
+        .map((carrier) => ({
+          ...carrier,
+          matchScore: scoreCarrierForRequest(submission, carrier)
+        }))
+        .filter((carrier) => carrier.matchScore > 0)
+        .sort((a, b) => b.matchScore - a.matchScore)
+        .slice(0, 3);
+
+      this.setData({
+        pendingSubmission: submission,
+        matchingCarriers,
+        showingMatches: true
+      });
+    } catch (error) {
+      wx.showToast({ title: "Match failed", icon: "none" });
+    } finally {
+      wx.hideLoading();
+    }
+  },
+
+  async publishPendingRequest() {
+    const submission = this.data.pendingSubmission;
+    if (!submission) return;
+
     wx.showLoading({ title: "Submitting" });
     try {
-      const submission = {
-        type: "request",
-        name: values.name,
-        contact: "Platform messaging",
-        fromLocation: this.data.fromCityOptions[this.data.fromCityIndex],
-        toLocation: this.data.toCityOptions[this.data.toCityIndex],
-        itemName: values.itemName,
-        estimatedValueEur: Number(values.estimatedValueEur),
-        desiredDeliveryDate: this.data.desiredDeliveryDate,
-        budgetEur: Number(values.budgetEur),
-        chinaDomesticShipping: this.data.shippingOptions[this.data.shippingIndex],
-        notes: values.notes || "",
-        confirmation: true
-      };
-
       wx.hideLoading();
       await this.requestPaymentPlaceholder(submission);
       wx.showLoading({ title: "Saving" });
       await addSubmission(submission);
       wx.showToast({ title: "Saved", icon: "success" });
-      setTimeout(() => wx.switchTab({ url: "/pages/my/my" }), 600);
+      setTimeout(() => wx.switchTab({ url: "/pages/market/market" }), 600);
     } catch (error) {
       if (error.message !== "Payment cancelled") {
         wx.showToast({ title: "Submit failed", icon: "none" });
@@ -131,5 +170,50 @@ Page({
     } finally {
       wx.hideLoading();
     }
+  },
+
+  contactMatchingCarrier() {
+    const carrier = this.data.matchingCarriers[0];
+    if (!carrier) {
+      wx.showToast({ title: "No matching carrier", icon: "none" });
+      return;
+    }
+
+    const conversation = createOrOpenConversation({
+      postType: "carrier",
+      postId: carrier._id,
+      otherUserName: carrier.name || "Carrier",
+      item: carrier.availableLuggageSpace || "Carry space",
+      route: carrier.travelRoute || "Route pending",
+      reward: carrier.expectedReward || "Reward pending",
+      status: "Negotiating"
+    });
+
+    wx.navigateTo({ url: `/pages/chat/chat?id=${conversation.id}` });
   }
 });
+
+function normalize(value) {
+  return String(value || "").toLowerCase().replace(/\s/g, "").replace(/'/g, "");
+}
+
+function sameDate(a, b) {
+  if (!a || !b) return false;
+  return Math.abs(new Date(a).getTime() - new Date(b).getTime()) <= 7 * 24 * 60 * 60 * 1000;
+}
+
+function scoreCarrierForRequest(request, carrier) {
+  const route = normalize(carrier.travelRoute);
+  const from = normalize(request.fromLocation);
+  const to = normalize(request.toLocation);
+  const category = request.itemCategory;
+  let score = 0;
+
+  if (route.includes(from) && route.includes(to)) score += 100;
+  if (route.includes(to)) score += 45;
+  if (route.includes(from)) score += 25;
+  if (sameDate(request.desiredDeliveryDate, carrier.travelDate)) score += 20;
+  if ((carrier.acceptedItemTypes || []).includes(category)) score += 15;
+
+  return score;
+}
