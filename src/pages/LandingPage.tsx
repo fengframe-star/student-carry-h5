@@ -91,7 +91,7 @@ export default function LandingPage() {
         </div>
       </div>
 
-      <section className="mt-5 rounded-[32px] border border-white/10 bg-[radial-gradient(circle_at_20%_0%,rgba(56,189,248,0.18),transparent_34%),rgba(31,34,50,0.92)] p-5 shadow-2xl sm:p-6">
+      <section className="p-2">
         <h2 className="text-xl font-black text-white">{t("How it works", "如何使用")}</h2>
 
         <div
@@ -212,11 +212,17 @@ function StepPreview({ index }: { index: number }) {
               €20
             </span>
           </div>
-          <div className="mt-2 grid grid-cols-3 gap-2 text-[0.68rem] font-bold text-slate-300">
-            <span className="rounded-xl bg-white/[0.06] px-2.5 py-2">Documents</span>
-            <span className="rounded-xl bg-white/[0.06] px-2.5 py-2">5月15日</span>
-            <span className="rounded-xl bg-emerald-400/10 px-2.5 py-2 text-emerald-100">Open</span>
-          </div>
+          <div className="mt-3 flex items-center gap-2 text-[0.68rem] font-bold">
+  <span className="flex-1 rounded-xl bg-white/[0.06] px-2.5 py-2 text-slate-300">
+    Documents
+  </span>
+  <span className="flex-1 whitespace-nowrap rounded-xl bg-white/[0.06] px-2.5 py-2 text-slate-300">
+    5月15日
+  </span>
+  <span className="ml-auto shrink-0 whitespace-nowrap text-emerald-100">
+    Open
+  </span>
+</div>
         </div>
       </div>
     );
@@ -224,7 +230,7 @@ function StepPreview({ index }: { index: number }) {
 
   if (index === 1) {
     return (
-      <div className="mx-auto mt-4 h-[300px] w-[86%] overflow-hidden rounded-[22px] border border-sky-300/15 bg-[#071223]/70 p-3 shadow-[0_18px_50px_rgba(56,189,248,0.08)]">
+      <div className="mx-auto mt-2 h-[300px] w-[86%] overflow-hidden rounded-[22px] border border-sky-300/15 bg-[#071223]/70 p-3 shadow-[0_18px_50px_rgba(56,189,248,0.08)]">
         <div className="rounded-2xl border border-white/10 bg-white/[0.065] px-3 py-1.5">
           <div className="flex items-center justify-between gap-1 text-[0.72rem] font-black text-white">
             <span>上海 → 巴黎</span>
