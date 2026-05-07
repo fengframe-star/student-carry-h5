@@ -205,7 +205,7 @@ function StepPreview({ index }: { index: number }) {
           <span className="rounded-full bg-[#38bdf8] px-3 py-1.5 text-center text-white">帮我带</span>
           <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-center text-slate-300">顺路送</span>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[0.065] p-4 text-left">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.065] p-3 text-left">
           <div className="flex items-center justify-between gap-3">
             <p className="truncate text-sm font-black text-white">Shanghai → Paris</p>
             <span className="shrink-0 rounded-full bg-sky-400/15 px-2.5 py-1 text-[0.68rem] font-black text-sky-100">

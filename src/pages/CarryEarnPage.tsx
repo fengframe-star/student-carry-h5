@@ -169,7 +169,7 @@ export default function CarryEarnPage() {
             Contact details will be handled through the platform messaging system.
           </Notice>
         </div>
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           <RouteSelect
             label="Departure / 出发地"
             country={form.fromCountry}
@@ -312,7 +312,7 @@ function RouteSelect({
   return (
     <div>
       <p className="text-sm font-semibold leading-6 text-slate-100">{label}</p>
-      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+      <div className="mt-2 grid gap-2 grid-cols-2">
         <select
           value={country}
           onChange={(event) => onCountryChange(event.target.value as CountryName)}

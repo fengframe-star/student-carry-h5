@@ -76,26 +76,29 @@ export default function MessagesPage() {
         className="mt-5 overflow-hidden"
         onTouchStart={(event) => setTouchStart(event.touches[0]?.clientX ?? null)}
         onTouchEnd={(event) => handleTouchEnd(event.changedTouches[0]?.clientX ?? 0)}
+        onTouchCancel={() => setTouchStart(null)}
         onMouseDown={(event) => setTouchStart(event.clientX)}
         onMouseUp={(event) => handleTouchEnd(event.clientX)}
+        onMouseLeave={() => setTouchStart(null)}
       >
         <div className="relative mx-auto h-[88px] max-w-[420px]">
           {messageCards.map((card, index) => {
             const Icon = card.icon;
             const position = (index - activeCard + messageCards.length) % messageCards.length;
             const isFront = position === 0;
-            const offset = position === 0 ? 0 : position === 1 ? 34 : -34;
+            const offset = position === 0 ? 0 : position === 1 ? 92 : -92;
             const cardStyle = {
-              transform: `translateX(${offset}px) scale(${isFront ? 1 : 0.92})`,
-              opacity: isFront ? 1 : 0.35,
-              zIndex: isFront ? 3 : 1,
+              transform: `translateX(calc(-50% + ${offset}px)) scale(${isFront ? 1 : 0.9})`,
+              opacity: isFront ? 1 : 0.38,
+              filter: isFront ? "blur(0px)" : "blur(0.8px)",
+              zIndex: isFront ? 3 : position === 1 ? 2 : 1,
               pointerEvents: isFront ? "auto" : "none",
             } as const;
 
             return (
               <article
                 key={card.titleEn}
-                className="how-stack-card absolute inset-x-0 top-0 h-[82px] overflow-hidden rounded-[20px] border border-white/10 bg-[#171b2b]/95 p-2.5 shadow-xl backdrop-blur"
+                className="how-stack-card absolute left-1/2 top-0 h-[82px] w-[68%] max-w-[280px] overflow-hidden rounded-[20px] border border-white/10 bg-[#171b2b]/95 p-2.5 shadow-xl backdrop-blur"
                 style={cardStyle}
               >
                 <div className="flex items-start justify-between gap-2">
