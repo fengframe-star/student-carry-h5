@@ -218,9 +218,6 @@ function StepPreview({ index }: { index: number }) {
             <span className="rounded-xl bg-emerald-400/10 px-2.5 py-2 text-emerald-100">Open</span>
           </div>
         </div>
-        <div className="mt-2.5 h-1.5 rounded-full bg-white/[0.06]">
-          <div className="h-full w-2/3 rounded-full bg-[#38bdf8]/70" />
-        </div>
       </div>
     );
   }
@@ -272,14 +269,6 @@ function StepPreview({ index }: { index: number }) {
         <div className="rounded-xl bg-emerald-400/10 px-3 py-2 text-xs font-black text-emerald-100">
           Transaction completed ✓
         </div>
-      </div>
-      <div className="mt-2 rounded-xl bg-white/[0.05] px-3 py-1.5 text-center text-[0.66rem] font-bold text-slate-300">
-        双方确认完成 ✓
-      </div>
-      <div className="mt-2.5 grid grid-cols-3 gap-1.5">
-        <span className="h-1.5 rounded-full bg-sky-300/80" />
-        <span className="h-1.5 rounded-full bg-sky-300/80" />
-        <span className="h-1.5 rounded-full bg-emerald-300/90" />
       </div>
     </div>
   );
