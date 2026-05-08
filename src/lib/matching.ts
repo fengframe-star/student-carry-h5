@@ -11,6 +11,25 @@ export const itemCategories: ItemCategory[] = [
   "Others",
 ];
 
+export function itemCategoryLabel(category: ItemCategory | string | undefined, language: "en" | "zh") {
+  if (!category) {
+    return language === "zh" ? "其他" : "Others";
+  }
+
+  const labels: Record<string, string> = {
+    Documents: "文件",
+    Clothes: "衣物",
+    Cosmetics: "美妆",
+    Electronics: "电子产品",
+    Gifts: "礼品",
+    Food: "食品",
+    "Medicine (restricted)": "药品（受限）",
+    Others: "其他",
+  };
+
+  return language === "zh" ? labels[category] || category : category;
+}
+
 function normalize(value: string) {
   return value.toLowerCase().replace(/\s/g, "").replace(/'/g, "");
 }
@@ -40,7 +59,7 @@ export function requestRoute(request: Pick<RequestSubmission, "fromLocation" | "
 
 export function reputationFor(index = 0) {
   return {
-    completed: [5, 3, 8, 2][index % 4],
+    pastMatches: [5, 3, 8, 2][index % 4],
     responseSpeed: ["Usually replies in 10 min", "Replies within 1 hour", "Fast response", "Same-day reply"][index % 4],
     active: index % 2 === 0 ? "Active today" : "Active recently",
     verified: index % 3 === 0,

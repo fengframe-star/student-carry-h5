@@ -1,25 +1,33 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
-import { Send } from "lucide-react";
+import { ImagePlus, Send, X } from "lucide-react";
 import BackButton from "../components/BackButton";
 import {
   appendConversationMessage,
+  currentUserId,
   getConversation,
+  hideConversationMessageForMe,
   markConversationRead,
+  recallConversationMessage,
   updateConversationStatus,
   type Conversation,
+  type ConversationMessage,
 } from "../lib/conversations";
+import { readImageAsDataUrl } from "../lib/imageFiles";
 import { useLanguage } from "../lib/language";
-import { isCompletedStatus, isMatchedStatus, publicStatusLabel } from "../lib/orderAccess";
+import { isMatchedStatus, localizedStatusLabel } from "../lib/orderAccess";
 import { updateSubmission } from "../lib/submissions";
 
 export default function ChatDetailPage() {
   const { conversationId } = useParams();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const [conversation, setConversation] = useState<Conversation | null>(() =>
     conversationId ? getConversation(conversationId) : null,
   );
   const [draft, setDraft] = useState("");
+  const [pendingImage, setPendingImage] = useState("");
+  const [activeActionMessageId, setActiveActionMessageId] = useState<string | null>(null);
+  const [pressTimer, setPressTimer] = useState<number | null>(null);
 
   useEffect(() => {
     if (!conversationId) {
@@ -34,14 +42,15 @@ export default function ChatDetailPage() {
     event.preventDefault();
     const text = draft.trim();
 
-    if (!text) {
+    if (!text && !pendingImage) {
       return;
     }
 
     if (conversation) {
-      setConversation(appendConversationMessage(conversation.id, text));
+      setConversation(appendConversationMessage(conversation.id, text || undefined, pendingImage || undefined));
     }
     setDraft("");
+    setPendingImage("");
   }
 
   if (!conversation) {
@@ -49,11 +58,50 @@ export default function ChatDetailPage() {
   }
 
   const isMatched = isMatchedStatus(conversation.status);
-  const isCompleted = isCompletedStatus(conversation.status);
   const actionLabel =
     conversation.postType === "request"
       ? t("Accept Request", "接单")
       : t("Confirm Match", "同意合作");
+
+  function openMessageActions(messageId?: string) {
+    if (messageId) {
+      setActiveActionMessageId((current) => (current === messageId ? null : messageId));
+    }
+  }
+
+  function startLongPress(messageId?: string) {
+    if (!messageId) return;
+    const timer = window.setTimeout(() => openMessageActions(messageId), 520);
+    setPressTimer(timer);
+  }
+
+  function clearLongPress() {
+    if (pressTimer) {
+      window.clearTimeout(pressTimer);
+      setPressTimer(null);
+    }
+  }
+
+  function canRecall(message: ConversationMessage) {
+    return (
+      message.senderId === currentUserId &&
+      !message.recalled &&
+      Boolean(message.createdAt) &&
+      Date.now() - (message.createdAt || 0) <= 120_000
+    );
+  }
+
+  function handleRecall(message: ConversationMessage) {
+    if (!message.id || !conversation) return;
+    setConversation(recallConversationMessage(conversation.id, message.id));
+    setActiveActionMessageId(null);
+  }
+
+  function handleLocalDelete(message: ConversationMessage) {
+    if (!message.id || !conversation) return;
+    setConversation(hideConversationMessageForMe(conversation.id, message.id));
+    setActiveActionMessageId(null);
+  }
 
   return (
     <section className="mx-auto flex min-h-[calc(100vh-132px)] max-w-3xl flex-col px-4 py-6 sm:px-6 sm:py-8">
@@ -65,7 +113,7 @@ export default function ChatDetailPage() {
             <p className="mt-1 text-sm font-semibold text-slate-300">{conversation.route}</p>
           </div>
           <span className="rounded-full bg-sky-400/15 px-3 py-1 text-xs font-black text-sky-100">
-            {publicStatusLabel(conversation.status)}
+            {localizedStatusLabel(conversation.status, language)}
           </span>
         </div>
         <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-300 sm:grid-cols-4">
@@ -76,48 +124,45 @@ export default function ChatDetailPage() {
         </div>
         <button
           type="button"
-          disabled={isMatched || isCompleted}
+          disabled={isMatched}
           onClick={() => {
             setConversation(updateConversationStatus(conversation.id, "Matched"));
             void updateSubmission(conversation.postId, { status: "Matched" });
           }}
           className="pressable mt-2 w-full rounded-xl bg-[#38bdf8] px-4 py-2 text-sm font-black text-white disabled:bg-white/10 disabled:text-slate-400"
         >
-          {isCompleted ? t("Completed", "已完成") : isMatched ? t("Matched", "已匹配") : actionLabel}
+          {isMatched ? t("Matched", "已匹配") : actionLabel}
         </button>
-        {isMatched && !isCompleted ? (
+        {isMatched ? (
           <button
             type="button"
             onClick={() => {
-              setConversation(updateConversationStatus(conversation.id, "Completed"));
-              void updateSubmission(conversation.postId, { status: "Completed" });
-            }}
-            className="pressable mt-2 w-full rounded-xl bg-emerald-400/15 px-4 py-2 text-sm font-black text-emerald-100 ring-1 ring-emerald-300/20"
-          >
-            完成交易 / Complete Transaction
-          </button>
-        ) : null}
-        {isMatched && !isCompleted ? (
-          <button
-            type="button"
-            onClick={() => {
-              setConversation(updateConversationStatus(conversation.id, "Negotiating"));
+              setConversation(updateConversationStatus(conversation.id, "Open"));
               void updateSubmission(conversation.postId, { status: "Open" });
             }}
             className="pressable mt-2 w-full rounded-xl border border-red-300/25 bg-red-500/10 px-4 py-2 text-sm font-black text-red-100"
           >
-            取消匹配 / Cancel Match
+            {t("Cancel Match", "取消匹配")}
           </button>
         ) : null}
       </div>
 
-      <div className="flex-1 space-y-4 pb-28 pt-6">
-        {conversation.messages.map((message, index) => {
-          const isMe = message.author === "Me";
+      <div className="flex-1 space-y-4 pb-44 pt-6">
+        {conversation.messages
+          .filter((message) => !message.hiddenForUserIds?.includes(currentUserId))
+          .map((message) => {
+          const isMe = message.senderId === currentUserId || message.author === "Me";
+          if (message.recalled) {
+            return (
+              <p key={message.id} className="text-center text-xs font-semibold text-slate-500">
+                {isMe ? t("You recalled a message", "你撤回了一条消息") : t("Message recalled", "对方撤回了一条消息")}
+              </p>
+            );
+          }
 
           return (
             <div
-              key={`${message.author}-${index}`}
+              key={message.id}
               className={`flex items-end gap-2 ${isMe ? "justify-end" : "justify-start"}`}
             >
               {!isMe ? (
@@ -126,14 +171,50 @@ export default function ChatDetailPage() {
                 </div>
               ) : null}
               <div
-                className={`max-w-[78%] rounded-[22px] px-4 py-3 text-sm leading-6 shadow-xl ${
+                onPointerDown={() => startLongPress(message.id)}
+                onPointerUp={clearLongPress}
+                onPointerLeave={clearLongPress}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  openMessageActions(message.id);
+                }}
+                className={`group relative max-w-[78%] rounded-[22px] px-4 py-3 text-sm leading-6 shadow-xl ${
                   isMe
                     ? "bg-[#38bdf8] text-white"
                     : "border border-white/10 bg-[#1f2232]/95 text-slate-100"
                 }`}
               >
-                <p className="text-xs font-black opacity-75">{message.author}</p>
-                <p className="mt-1">{message.text}</p>
+                <p className="text-xs font-black opacity-75">
+                  {message.author === "Me" ? t("Me", "我") : message.author}
+                </p>
+                {message.text ? <p className="mt-1">{message.text}</p> : null}
+                {message.imageDataUrl ? (
+                  <img
+                    src={message.imageDataUrl}
+                    alt="Chat attachment"
+                    className="mt-2 max-h-64 w-full rounded-2xl object-cover"
+                  />
+                ) : null}
+                {activeActionMessageId === message.id ? (
+                  <div className={`absolute top-full z-20 mt-2 flex gap-2 ${isMe ? "right-0" : "left-0"}`}>
+                    {canRecall(message) ? (
+                      <button
+                        type="button"
+                        onClick={() => handleRecall(message)}
+                        className="rounded-full bg-[#050918]/95 px-3 py-1.5 text-[0.7rem] font-black text-sky-100 ring-1 ring-sky-300/20"
+                      >
+                        {t("Recall", "撤回")}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => handleLocalDelete(message)}
+                      className="rounded-full bg-[#050918]/95 px-3 py-1.5 text-[0.7rem] font-black text-slate-200 ring-1 ring-white/10"
+                    >
+                      {t("Delete", "删除")}
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
           );
@@ -142,21 +223,57 @@ export default function ChatDetailPage() {
 
       <form
         onSubmit={handleSend}
-        className="fixed inset-x-4 bottom-4 z-30 mx-auto flex max-w-3xl gap-2 rounded-[24px] border border-white/10 bg-[#1f2232]/95 p-2 shadow-2xl backdrop-blur sm:bottom-6"
+        className="fixed inset-x-4 bottom-4 z-30 mx-auto max-w-3xl rounded-[24px] border border-white/10 bg-[#1f2232]/95 p-2 shadow-2xl backdrop-blur sm:bottom-6"
       >
-        <input
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder="Type a message..."
-          className="min-w-0 flex-1 rounded-[18px] border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-sky-300/40"
-        />
-        <button
-          type="submit"
-          className="pressable flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#38bdf8] text-white"
-          aria-label="Send message"
-        >
-          <Send size={18} />
-        </button>
+        {pendingImage ? (
+          <div className="mb-2 flex items-start gap-3 rounded-[20px] border border-white/10 bg-white/[0.06] p-2">
+            <img src={pendingImage} alt="Selected preview" className="h-20 w-20 rounded-2xl object-cover" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-black text-white">{t("Image preview", "图片预览")}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">
+                {t("It will be sent only after you tap send.", "点击发送后才会发出。")}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPendingImage("")}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-slate-200"
+              aria-label="Remove selected image"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        ) : null}
+        <div className="flex gap-2">
+          <input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder={t("Type a message...", "输入消息...")}
+            className="min-w-0 flex-1 rounded-[18px] border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-sky-300/40"
+          />
+          <label className="pressable flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-[18px] border border-white/10 bg-white/[0.06] text-sky-100">
+            <ImagePlus size={18} />
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="sr-only"
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                setPendingImage(await readImageAsDataUrl(file));
+                event.target.value = "";
+              }}
+            />
+          </label>
+          <button
+            type="submit"
+            className="pressable flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#38bdf8] text-white"
+            aria-label="Send message"
+          >
+            <Send size={18} />
+          </button>
+        </div>
       </form>
     </section>
   );

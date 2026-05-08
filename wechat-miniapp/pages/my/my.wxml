@@ -60,7 +60,7 @@
         </view>
       </view>
     </block>
-    <view class="card muted" wx:else>暂无帮我带发布\nNo request posts yet.</view>
+    <view class="card muted" wx:else>还没有帮我带发布\nNo request posts yet.</view>
 
     <view class="section-title">我的顺路送</view>
     <view class="muted">My carry posts</view>
@@ -78,6 +78,6 @@
         </view>
       </view>
     </block>
-    <view class="card muted" wx:else>暂无顺路送发布\nNo carry posts yet.</view>
+    <view class="card muted" wx:else>还没有顺路送发布\nNo carry posts yet.</view>
   </block>
 </view>

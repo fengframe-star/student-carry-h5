@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import BackButton from "../components/BackButton";
 import Notice from "../components/Notice";
 import { isFirebaseConfigured } from "../lib/firebase";
+import { useLanguage } from "../lib/language";
 import { getSubmissions, updateSubmissionPublishedDate } from "../lib/submissions";
 import type { Submission } from "../types";
 
@@ -35,6 +36,7 @@ function submissionSummary(submission: Submission) {
 }
 
 export default function AdminDashboardPage() {
+  const { t } = useLanguage();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -108,7 +110,7 @@ export default function AdminDashboardPage() {
           </div>
           <label className="block min-w-52">
             <span className="text-xs font-semibold uppercase tracking-wide text-[#9a6b00]">
-              Published Date / 发布日期
+              {t("Published Date", "发布日期")}
             </span>
             <input
             type="date"
@@ -127,23 +129,23 @@ export default function AdminDashboardPage() {
 
         <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <dt className="text-slate-500">Name</dt>
+            <dt className="text-slate-500">{t("Name", "姓名")}</dt>
             <dd className="mt-1 font-medium">{submission.name}</dd>
           </div>
           <div>
-            <dt className="text-slate-500">Contact</dt>
+            <dt className="text-slate-500">{t("Contact", "联系方式")}</dt>
             <dd className="mt-1 font-medium break-words">{submission.contact}</dd>
           </div>
             <div>
-              <dt className="text-slate-500">Date</dt>
+              <dt className="text-slate-500">{t("Date", "日期")}</dt>
               <dd className="mt-1 font-medium">{summary.date}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Published Date / 发布日期</dt>
-              <dd className="mt-1 font-medium">{submission.publishedDate || "Not set"}</dd>
+              <dt className="text-slate-500">{t("Published Date", "发布日期")}</dt>
+              <dd className="mt-1 font-medium">{submission.publishedDate || t("Not set", "未设置")}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Reward / Budget</dt>
+              <dt className="text-slate-500">{t("Reward / Budget", "报酬 / 预算")}</dt>
               <dd className="mt-1 font-medium">{summary.amount}</dd>
             </div>
           </dl>
@@ -151,17 +153,17 @@ export default function AdminDashboardPage() {
         {submission.type === "request" && (
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
             <div>
-              <dt className="text-slate-500">Estimated value</dt>
+              <dt className="text-slate-500">{t("Estimated value", "预估价值")}</dt>
               <dd className="mt-1 font-medium">€{submission.estimatedValueEur}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">China domestic shipping</dt>
-              <dd className="mt-1 font-medium">{submission.chinaDomesticShipping || "Not sure"}</dd>
+              <dt className="text-slate-500">{t("China domestic shipping", "中国国内邮寄")}</dt>
+              <dd className="mt-1 font-medium">{submission.chinaDomesticShipping || t("Not sure", "不确定")}</dd>
             </div>
             <div>
-              <dt className="text-slate-500">Compliance confirmation</dt>
+              <dt className="text-slate-500">{t("Compliance confirmation", "合规确认")}</dt>
               <dd className="mt-1 font-medium">
-                {submission.confirmation ? "Confirmed" : "Missing"}
+                {submission.confirmation ? t("Confirmed", "已确认") : t("Missing", "缺失")}
               </dd>
             </div>
           </dl>
@@ -174,7 +176,7 @@ export default function AdminDashboardPage() {
         )}
 
         <p className="mt-4 text-xs text-slate-500">
-          Submitted {formatDate(submission.createdAt)}
+          {t("Submitted", "提交于")} {formatDate(submission.createdAt)}
         </p>
       </article>
     );
@@ -186,35 +188,34 @@ export default function AdminDashboardPage() {
       <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-[#9a6b00]">
-            Operations
+            {t("Operations", "运营管理")}
           </p>
-          <h1 className="mt-2 text-3xl font-bold">Admin order dashboard</h1>
+          <h1 className="mt-2 text-3xl font-bold">{t("Admin order dashboard", "管理员订单看板")}</h1>
           <p className="mt-3 max-w-2xl text-slate-600">
-            Review submitted requests and carrier profiles, then maintain the
-            Published Date / 发布日期 for each listing. Payment handling is intentionally excluded.
+            {t("Review submitted requests and carrier profiles, then maintain the Published Date for each listing.", "查看已提交的需求和顺路送资料，并维护每条发布的发布日期。")}
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3 text-center">
           <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-soft">
             <p className="text-2xl font-bold">{grouped.requests.length}</p>
-            <p className="text-xs font-medium text-slate-500">Requests</p>
+            <p className="text-xs font-medium text-slate-500">{t("Requests", "需求")}</p>
           </div>
           <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-soft">
             <p className="text-2xl font-bold">{grouped.carriers.length}</p>
-            <p className="text-xs font-medium text-slate-500">Carriers</p>
+            <p className="text-xs font-medium text-slate-500">{t("Carriers", "顺路送")}</p>
           </div>
         </div>
       </div>
 
       {!isFirebaseConfigured && (
-        <Notice title="Firebase setup needed" tone="warning">
-          Add your Firebase Vite environment variables to .env.local before the dashboard can load submissions.
+        <Notice title={t("Firebase setup needed", "需要配置 Firebase")} tone="warning">
+          {t("Add your Firebase Vite environment variables to .env.local before the dashboard can load submissions.", "请先在 .env.local 添加 Firebase Vite 环境变量，看板才能加载提交内容。")}
         </Notice>
       )}
 
       {error && (
         <div className="mt-6">
-          <Notice title="Dashboard error" tone="warning">
+          <Notice title={t("Dashboard error", "看板错误")} tone="warning">
             {error}
           </Notice>
         </div>
@@ -222,28 +223,28 @@ export default function AdminDashboardPage() {
 
       {loading ? (
         <div className="mt-6 rounded-lg border border-slate-200 bg-white p-6 text-slate-600 shadow-soft">
-          Loading submissions...
+          {t("Loading submissions...", "正在加载提交内容...")}
         </div>
       ) : (
         <div className="mt-8 grid gap-8">
           <section>
-            <h2 className="mb-4 text-xl font-semibold">Submitted requests</h2>
+            <h2 className="mb-4 text-xl font-semibold">{t("Submitted requests", "已提交需求")}</h2>
             <div className="grid gap-4">
               {grouped.requests.length > 0 ? (
                 grouped.requests.map(renderSubmission)
               ) : (
-                <EmptyState label="No requests submitted yet." />
+                <EmptyState label={t("No requests submitted yet.", "暂无需求提交。")} />
               )}
             </div>
           </section>
 
           <section>
-            <h2 className="mb-4 text-xl font-semibold">Carrier submissions</h2>
+            <h2 className="mb-4 text-xl font-semibold">{t("Carrier submissions", "顺路送提交")} </h2>
             <div className="grid gap-4">
               {grouped.carriers.length > 0 ? (
                 grouped.carriers.map(renderSubmission)
               ) : (
-                <EmptyState label="No carriers submitted yet." />
+                <EmptyState label={t("No carriers submitted yet.", "暂无顺路送提交。")} />
               )}
             </div>
           </section>

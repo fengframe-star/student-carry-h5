@@ -251,3 +251,9 @@ export function cityLabel(city: string, language: "en" | "zh") {
 export function routeFromParts(fromCity: string, toCity: string) {
   return `${fromCity} → ${toCity}`;
 }
+
+export function routeLabel(route: string, language: "en" | "zh") {
+  const [from = "", to = ""] = route.split(/→|->|至|到|-/).map((part) => part.trim());
+  if (!from && !to) return route;
+  return `${cityLabel(from, language)} → ${cityLabel(to, language)}`;
+}

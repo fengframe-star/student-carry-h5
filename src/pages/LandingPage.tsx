@@ -4,7 +4,7 @@ import { CheckCircle2, MessageCircle, PackageCheck, PackagePlus, Send } from "lu
 import { useLanguage } from "../lib/language";
 
 export default function LandingPage() {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const [activeStep, setActiveStep] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [isInteracting, setIsInteracting] = useState(false);
@@ -13,23 +13,23 @@ export default function LandingPage() {
     {
       icon: PackagePlus,
       titleCn: "发布需求 / 发布行程",
-      titleEn: "Publish request / trip",
-      bodyCn: "填写路线、物品、时间和预算生成需求。",
-      bodyEn: "Create a post from route, item, time, and budget.",
+      titleEn: "Publish Request / Trip",
+      bodyCn: "填写路线、物品和预算，快速发布需求。",
+      bodyEn: "Add your route, item, and reward to create a post.",
     },
     {
       icon: MessageCircle,
       titleCn: "沟通并匹配",
-      titleEn: "Match and chat",
+      titleEn: "Chat and Match",
       bodyCn: "确认路线、时间、预算和交接方式。",
       bodyEn: "Confirm route, timing, budget, and handover details.",
     },
     {
       icon: PackageCheck,
-      titleCn: "确认完成",
-      titleEn: "Confirm completion",
-      bodyCn: "双方确认完成交接后结束交易。",
-      bodyEn: "Close the transaction after both sides confirm handover.",
+      titleCn: "确认匹配",
+      titleEn: "Confirm Match",
+      bodyCn: "匹配后继续沟通时间、地点和交接细节。",
+      bodyEn: "Continue chatting about timing, location, and handoff details after matching.",
     },
   ];
 
@@ -64,15 +64,15 @@ export default function LandingPage() {
     <section className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12">
       <div className="rounded-[32px] border border-white/10 bg-[#1f2232]/90 p-6 shadow-2xl sm:p-8">
         <p className="text-sm font-bold tracking-wide text-slate-300">
-          {t("Cross-border carry matching for international students", "国际学生跨境顺路带物匹配")}
+          {t("Connect with students already heading your way.", "留学生顺路帮带平台")}
         </p>
         <h1 className="mt-5 text-5xl font-black leading-tight text-white">
           Student Carry
         </h1>
         <p className="mt-5 text-base leading-8 text-slate-300">
           {t(
-            "A student marketplace for posting requests, browsing carry routes, negotiating details, and confirming offline exchanges.",
-            "为留学生提供发布需求、浏览行程、沟通协商和线下确认的一站式匹配体验。",
+            "Post requests, match with travelers, and chat about handoff details.",
+            "发布需求，匹配顺路同学，在线沟通交接细节。",
           )}
         </p>
         <div className="mt-8 grid grid-cols-2 gap-3">
@@ -80,13 +80,13 @@ export default function LandingPage() {
             to="/post-request"
             className="pressable flex min-h-14 items-center justify-center rounded-2xl bg-[#38bdf8] px-3 text-center text-sm font-black text-white transition hover:bg-[#0ea5e9]"
           >
-            {t("Request", "帮我带")}
+            {t("Request Carry", "帮我带")}
           </Link>
           <Link
             to="/carry-earn"
             className="pressable flex min-h-14 items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-3 text-center text-sm font-black text-white transition hover:bg-white/15"
           >
-            {t("Carry", "顺路送")}
+            {t("I'm Traveling", "顺路送")}
           </Link>
         </div>
       </div>
@@ -141,10 +141,14 @@ export default function LandingPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <span className="text-xs font-black text-sky-200">0{index + 1}</span>
-                        <h3 className="mt-1 text-lg font-black text-white">{step.titleCn}</h3>
-                        <p className="mt-0.5 text-[0.68rem] font-bold uppercase tracking-wide text-slate-500">
-                          {step.titleEn}
-                        </p>
+                        <h3 className="mt-1 text-lg font-black text-white">
+                          {language === "zh" ? step.titleCn : step.titleEn}
+                        </h3>
+                        {language === "zh" ? (
+                          <p className="mt-0.5 text-[0.68rem] font-bold uppercase tracking-wide text-slate-500">
+                            {step.titleEn}
+                          </p>
+                        ) : null}
                       </div>
                       <span className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#38bdf8]/15 text-[#7dd3fc] ring-1 ring-[#38bdf8]/30">
                         {isFront ? <span className="active-dot" /> : null}
@@ -152,10 +156,10 @@ export default function LandingPage() {
                       </span>
                     </div>
                     <div className="mt-2 flex min-h-12 items-center text-left">
-                      <p className="text-sm leading-6 text-slate-300">{step.bodyCn}</p>
+                      <p className="text-sm leading-6 text-slate-300">{t(step.bodyEn, step.bodyCn)}</p>
                     </div>
                   </div>
-                  <StepPreview index={index} />
+                  <StepPreview index={index} language={language} />
                 </div>
               </article>
             );
@@ -181,43 +185,49 @@ export default function LandingPage() {
       <InfoCard
         titleCn="安全与隐私"
         titleEn="Safety & Privacy"
-        bodyCn="我们提供基础匹配与沟通服务。用户个人信息默认不会公开展示，平台鼓励通过可信方式完成线下交接与确认。"
-        bodyEn="We provide basic matching and communication tools for students. Personal information is not publicly displayed by default, and users are encouraged to complete exchanges through trusted offline verification."
+        bodyCn="平台仅提供信息发布与沟通工具。个人联系方式默认不会公开显示，建议双方在线下可信场所完成交接。"
+        bodyEn="The platform only provides posting and messaging tools. Personal contact details are hidden by default. We recommend completing handoffs in trusted public places."
         tone="blue"
       />
 
       <InfoCard
-        titleCn="平台规则"
-        titleEn="Platform Guidelines"
-        bodyCn="仅支持合法、可正常携带的小件物品。用户需自行确认海关、航空及目的地相关规定，禁止违禁品、灰产代购及受限制物品。"
-        bodyEn="Only legal and carry-on eligible small items are supported. Users are responsible for checking customs and airline regulations. Prohibited or restricted items are not allowed."
+        titleCn="携带须知"
+        titleEn="Carry Guidelines"
+        bodyCn="仅支持合法、可正常携带的物品。请自行确认海关、航空及目的地相关规定，禁止违禁品、灰产代购及受限制物品。"
+        bodyEn="Only legal and travel-friendly items are allowed. Please check customs, airline, and destination regulations before arranging a carry request."
         tone="red"
       />
     </section>
   );
 }
 
-function StepPreview({ index }: { index: number }) {
+function StepPreview({ index, language }: { index: number; language: "en" | "zh" }) {
   if (index === 0) {
     return (
       <div className="mx-auto mt-4 h-[300px] w-[86%] overflow-hidden rounded-[22px] border border-sky-300/15 bg-[#071223]/70 p-3 shadow-[0_18px_50px_rgba(56,189,248,0.08)]">
         <div className="mb-2.5 grid grid-cols-2 gap-2 text-[0.68rem] font-black">
-          <span className="rounded-full bg-[#38bdf8] px-3 py-1.5 text-center text-white">帮我带</span>
-          <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-center text-slate-300">顺路送</span>
+          <span className="rounded-full bg-[#38bdf8] px-3 py-1.5 text-center text-white">
+            {language === "zh" ? "帮我带" : "Request Carry"}
+          </span>
+          <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-center text-slate-300">
+            {language === "zh" ? "顺路送" : "I'm Traveling"}
+          </span>
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/[0.065] p-3 text-left">
           <div className="flex items-center justify-between gap-3">
-            <p className="truncate text-sm font-black text-white">Shanghai → Paris</p>
+            <p className="truncate text-sm font-black text-white">
+              {language === "zh" ? "上海 → 巴黎" : "Shanghai → Paris"}
+            </p>
             <span className="shrink-0 rounded-full bg-sky-400/15 px-2.5 py-1 text-[0.68rem] font-black text-sky-100">
               €20
             </span>
           </div>
           <div className="mt-3 flex items-center gap-2 text-[0.68rem] font-bold">
   <span className="flex-1 rounded-xl bg-white/[0.06] px-2.5 py-2 text-slate-300">
-    Documents
+    {language === "zh" ? "文件" : "Documents"}
   </span>
   <span className="flex-1 whitespace-nowrap rounded-xl bg-white/[0.06] px-2.5 py-2 text-slate-300">
-    5月15日
+    {language === "zh" ? "5月15日" : "May 15"}
   </span>
   <span className="ml-auto shrink-0 whitespace-nowrap text-emerald-100">
     Open
@@ -233,26 +243,32 @@ function StepPreview({ index }: { index: number }) {
       <div className="mx-auto mt-2 h-[300px] w-[86%] overflow-hidden rounded-[22px] border border-sky-300/15 bg-[#071223]/70 p-3 shadow-[0_18px_50px_rgba(56,189,248,0.08)]">
         <div className="rounded-2xl border border-white/10 bg-white/[0.065] px-3 py-1.5">
           <div className="flex items-center justify-between gap-1 text-[0.72rem] font-black text-white">
-            <span>上海 → 巴黎</span>
+            <span>{language === "zh" ? "上海 → 巴黎" : "Shanghai → Paris"}</span>
             <span className="text-sky-100">€20</span>
           </div>
           <div className="mt-1 flex items-center justify-between gap-2">
-            <p className="text-[0.62rem] font-semibold text-slate-400">文件 · 协商中</p>
+            <p className="text-[0.62rem] font-semibold text-slate-400">
+              {language === "zh" ? "文件 · Open" : "Documents · Open"}
+            </p>
             <span className="rounded-full bg-sky-400/15 px-2 py-0.5 text-[0.56rem] font-black text-sky-100">
-              匹配
+              {language === "zh" ? "匹配" : "Match"}
             </span>
           </div>
         </div>
         <div className="mt-2 space-y-1">
           <div className="max-w-[84%] rounded-2xl rounded-bl-md bg-white/[0.08] px-2.5 py-1 text-[0.6rem] leading-3 text-slate-200">
-            <span className="font-black text-sky-100">Me: </span>你好，我想确认这单的细节。
+            <span className="font-black text-sky-100">{language === "zh" ? "我：" : "Me: "}</span>
+            {language === "zh" ? "你好，我想确认这单的细节。" : "Hi, I would like to discuss this post."}
           </div>
           <div className="ml-auto max-w-[84%] rounded-2xl rounded-br-md bg-[#38bdf8] px-2.5 py-1 text-[0.6rem] font-semibold leading-3 text-white">
-            <span className="font-black">Post owner: </span>可以，我们确认路线和时间。
+            <span className="font-black">{language === "zh" ? "发布者：" : "Post owner: "}</span>
+            {language === "zh" ? "可以，我们确认路线和时间。" : "Sure, we can confirm the details here."}
           </div>
         </div>
         <div className="mt-3 flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] p-0.3 pl-3">
-          <span className="min-w-0 flex-1 truncate text-[0.6rem] font-semibold text-slate-500">输入消息...</span>
+          <span className="min-w-0 flex-1 truncate text-[0.6rem] font-semibold text-slate-500">
+            {language === "zh" ? "输入消息..." : "Type a message..."}
+          </span>
           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#38bdf8] text-white">
             <Send size={11} />
           </span>
@@ -270,11 +286,14 @@ function StepPreview({ index }: { index: number }) {
       </div>
       <div className="mt-3 space-y-2 text-center">
         <div className="rounded-xl bg-white/[0.06] px-3 py-2 text-xs font-black text-white">
-          Package received ✓
+          {language === "zh" ? "已匹配 ✓" : "Match confirmed ✓"}
         </div>
         <div className="rounded-xl bg-emerald-400/10 px-3 py-2 text-xs font-black text-emerald-100">
-          Transaction completed ✓
+          {language === "zh" ? "聊天继续开放 ✓" : "Chat stays open ✓"}
         </div>
+      </div>
+      <div className="mt-3 rounded-xl bg-white/[0.05] px-3 py-2 text-center text-[0.66rem] font-bold text-slate-300">
+        {language === "zh" ? "双方可取消匹配 ✓" : "Either side can cancel ✓"}
       </div>
     </div>
   );

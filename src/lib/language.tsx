@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext, useMemo, useState } from "react";
 
-type Language = "en" | "zh";
+export type Language = "en" | "zh";
 
 type LanguageContextValue = {
   language: Language;
@@ -47,4 +47,8 @@ export function useLanguage() {
   }
 
   return value;
+}
+
+export function pickText(language: Language, en: string, zh: string) {
+  return language === "zh" ? zh : en;
 }

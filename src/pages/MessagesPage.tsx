@@ -9,8 +9,8 @@ const messageCards = [
     icon: BadgeEuro,
     titleCn: "改价协商",
     titleEn: "Price negotiation",
-    bodyCn: "讨论预算、报酬、押金或补偿方式。",
-    bodyEn: "Discuss budget, reward, deposit, or compensation details.",
+    bodyCn: "讨论预算、报酬或补偿方式。",
+    bodyEn: "Discuss budget, reward, or compensation details.",
   },
   {
     icon: MapPin,
@@ -160,8 +160,7 @@ export default function MessagesPage() {
         </div>
       ) : (
         <div className="mt-5 rounded-[28px] border border-white/10 bg-[#1f2232]/90 p-6 text-center shadow-2xl">
-          <h2 className="text-lg font-black text-white">暂无消息</h2>
-          <p className="mt-1 text-sm font-semibold text-slate-400">{t("No messages yet", "暂无消息")}</p>
+          <h2 className="text-lg font-black text-white">{t("No messages yet", "暂无消息")}</h2>
           <p className="mt-4 text-sm leading-6 text-slate-300">
             {t(
               "Conversations will appear here after you contact a post owner.",

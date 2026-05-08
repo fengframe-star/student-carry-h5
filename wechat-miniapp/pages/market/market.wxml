@@ -16,7 +16,7 @@
   <view class="search-card">
     <view class="search-head">
       <view>
-        <view class="search-title">自定义搜索</view>
+        <view class="search-title">搜索路线</view>
         <view class="search-subtitle">City to city</view>
       </view>
       <button class="clear-button" bindtap="clearSearch">清除 / Clear</button>
@@ -74,7 +74,7 @@
     </view>
   </view>
   <view class="card muted" wx:if="{{activeType === 'request' && !requests.length}}">
-    暂无帮我带发布
+    还没有帮我带发布
     <text class="en">No request posts yet.</text>
   </view>
 
@@ -91,7 +91,7 @@
     </view>
   </view>
   <view class="card muted" wx:if="{{activeType === 'carrier' && !carriers.length}}">
-    暂无顺路送发布
+    还没有顺路送发布
     <text class="en">No carry posts yet.</text>
   </view>
 </view>

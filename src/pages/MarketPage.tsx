@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { reputationFor } from "../lib/matching";
-import { canOpenSubmission, isOpenStatus, publicStatusLabel } from "../lib/orderAccess";
+import { canOpenSubmission, isOpenStatus, localizedStatusLabel } from "../lib/orderAccess";
 import { getSubmissions } from "../lib/submissions";
 import { useLanguage } from "../lib/language";
 import type { CarrierSubmission, RequestSubmission, Submission } from "../types";
@@ -53,7 +53,7 @@ export default function MarketPage() {
     void load();
   }, []);
 
-  const marketSubmissions = submissions.filter((submission) => submission.status !== "Completed");
+  const marketSubmissions = submissions.filter((submission) => isOpenStatus(submission.status));
   const requests = marketSubmissions.filter(
     (submission): submission is RequestSubmission =>
       submission.type === "request" && isOpenStatus(submission.status),
@@ -106,7 +106,7 @@ export default function MarketPage() {
         <p className="text-xs font-bold text-slate-400">Market</p>
         <h1 className="mt-2 text-3xl font-black text-white">{t("Market", "匹配集市")}</h1>
         <p className="mt-2 text-sm leading-6 text-slate-300">
-          {t("Browse public request and carry posts.", "浏览所有公开的帮我带和顺路送发布。")}
+          {t("Browse public requests and travel routes.", "浏览公开需求与顺路行程。")}
         </p>
         <div className="mt-5 grid grid-cols-3 gap-3">
           <button
@@ -114,21 +114,21 @@ export default function MarketPage() {
             onClick={() => setActiveType("request")}
             className={tabButtonClass(activeType === "request")}
           >
-            {t("Request", "帮我带")}
+            {t("Requests", "帮我带")}
           </button>
           <button
             type="button"
             onClick={() => setActiveType("carrier")}
             className={tabButtonClass(activeType === "carrier")}
           >
-            {t("Carry", "顺路送")}
+            {t("Traveling", "顺路送")}
           </button>
           <button
             type="button"
             onClick={() => setActiveType("all")}
             className={tabButtonClass(activeType === "all")}
           >
-            All
+            {t("All", "全部")}
           </button>
         </div>
       </div>
@@ -144,19 +144,19 @@ export default function MarketPage() {
             to={publishTo}
             className={`shrink-0 rounded-2xl bg-[#38bdf8] px-4 py-3 text-sm font-black text-white ${activeType === "all" ? "hidden" : ""}`}
           >
-            {t("Post", "我要发布")}
+            {t("Post", "发布需求")}
           </Link>
         </div>
 
         <label className="mt-5 block">
-          <span className="text-sm font-semibold text-slate-100">{t("Custom search", "自定义搜索")}</span>
+          <span className="text-sm font-semibold text-slate-100">{t("Search Routes", "搜索路线")}</span>
           <span className="mt-1 block text-xs text-slate-500">
-            {t("Search by city to city, e.g. China to Paris", "按城市到城市搜索，例如中国到巴黎")}
+            {t("Search by city, country, or route", "按城市、国家与路线搜索")}
           </span>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="西安至巴黎 / Shanghai to Paris"
+            placeholder={t("e.g. Xi'an → Paris", "例如：西安至巴黎")}
             className="mt-3 w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-[#38bdf8]"
           />
         </label>
@@ -164,10 +164,10 @@ export default function MarketPage() {
 
       {loading ? (
         <div className="mt-5 rounded-[28px] border border-white/10 bg-[#1f2232]/90 p-5 text-slate-300">
-          Loading...
+          {t("Loading...", "加载中...")}
         </div>
       ) : activeType === "all" ? (
-        <ListingGrid emptyLabel="暂无发布 / No posts yet.">
+        <ListingGrid emptyLabel={t("No posts yet.", "暂无发布")}>
           {visibleAll.map((item, index) =>
             item.type === "request" ? (
               <RequestCard key={item.id} item={item} index={index} />
@@ -177,13 +177,13 @@ export default function MarketPage() {
           )}
         </ListingGrid>
       ) : activeType === "request" ? (
-        <ListingGrid emptyLabel="暂无帮我带发布 / No request posts yet.">
+        <ListingGrid emptyLabel={t("No request posts yet.", "还没有帮我带发布")}>
           {visibleRequests.map((item) => (
             <RequestCard key={item.id} item={item} index={visibleRequests.indexOf(item)} />
           ))}
         </ListingGrid>
       ) : (
-        <ListingGrid emptyLabel="暂无顺路送发布 / No carry posts yet.">
+        <ListingGrid emptyLabel={t("No carry posts yet.", "还没有顺路送发布")}>
           {visibleCarriers.map((item) => (
             <CarryCard key={item.id} item={item} index={visibleCarriers.indexOf(item)} />
           ))}
@@ -194,37 +194,29 @@ export default function MarketPage() {
 }
 
 function StatusBadge({ status }: { status?: string }) {
+  const { language } = useLanguage();
   return (
     <span className="rounded-full bg-sky-400/15 px-2.5 py-1 text-[0.68rem] font-black text-sky-100">
-      {publicStatusLabel(status)}
+      {localizedStatusLabel(status, language)}
     </span>
   );
 }
 
-function ReputationLine({ index }: { index: number }) {
-  const reputation = reputationFor(index);
-  return (
-    <p className="market-line text-[0.72rem]">
-      Completed: {reputation.completed} · {reputation.active}
-    </p>
-  );
-}
-
 function RequestCard({ item, index }: { item: RequestSubmission; index: number }) {
+  const { t } = useLanguage();
   const canOpen = canOpenSubmission(item);
   const content = (
     <>
       <div className="flex items-center justify-between gap-2">
-        <p className="market-route">{item.fromLocation || "From"} → {item.toLocation || "To"}</p>
+        <p className="market-route">{item.fromLocation || t("From", "出发地")} → {item.toLocation || t("To", "到达地")}</p>
         <StatusBadge status={item.status} />
       </div>
-      <h2 className="market-main">{item.itemName || "Item"}</h2>
-      <p className="market-line">{item.itemCategory || "Others"} · {item.desiredDeliveryDate || "Date pending"}</p>
+      <h2 className="market-main">{item.itemName || t("Item", "物品")}</h2>
+      <p className="market-line">{item.itemCategory || t("Others", "其他")} · {item.desiredDeliveryDate || t("Date pending", "日期待定")}</p>
       <p className="market-price">€{item.budgetEur || 0}</p>
-      <ReputationLine index={index} />
       {!canOpen ? (
         <p className="mt-3 rounded-2xl bg-white/[0.06] px-3 py-2 text-[0.68rem] font-bold text-slate-400">
-          {`Only transaction parties can view this matched order.`}
+          {t("Only transaction parties can view this matched order.", "仅交易双方可查看该已匹配订单。")}
         </p>
       ) : null}
     </>
@@ -242,20 +234,20 @@ function RequestCard({ item, index }: { item: RequestSubmission; index: number }
 }
 
 function CarryCard({ item, index }: { item: CarrierSubmission; index: number }) {
+  const { t } = useLanguage();
   const canOpen = canOpenSubmission(item);
   const content = (
     <>
       <div className="flex items-center justify-between gap-2">
-        <p className="market-route">{item.travelRoute || "Route pending"}</p>
+        <p className="market-route">{item.travelRoute || t("Route pending", "路线待定")}</p>
         <StatusBadge status={item.status} />
       </div>
-      <h2 className="market-main">{item.availableLuggageSpace || "Space pending"}</h2>
-      <p className="market-line">{item.acceptedItemTypes?.join(", ") || "Flexible"} · {item.travelDate || "Date pending"}</p>
-      <p className="market-price">{item.expectedReward || "Reward pending"}</p>
-      <ReputationLine index={index} />
+      <h2 className="market-main">{item.availableLuggageSpace || t("Space pending", "空间待定")}</h2>
+      <p className="market-line">{item.acceptedItemTypes?.join(", ") || t("Flexible", "灵活")} · {item.travelDate || t("Date pending", "日期待定")}</p>
+      <p className="market-price">{item.expectedReward || t("Reward pending", "报酬待定")}</p>
       {!canOpen ? (
         <p className="mt-3 rounded-2xl bg-white/[0.06] px-3 py-2 text-[0.68rem] font-bold text-slate-400">
-          {`Only transaction parties can view this matched order.`}
+          {t("Only transaction parties can view this matched order.", "仅交易双方可查看该已匹配订单。")}
         </p>
       ) : null}
     </>

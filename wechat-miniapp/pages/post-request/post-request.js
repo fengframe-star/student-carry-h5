@@ -111,6 +111,7 @@ Page({
     }
 
     const submission = {
+      createdAt: Date.now(),
       type: "request",
       name: values.name,
       contact: "Platform messaging",

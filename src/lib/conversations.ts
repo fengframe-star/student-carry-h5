@@ -1,6 +1,12 @@
 export type ConversationMessage = {
+  id?: string;
   author: "Post owner" | "Me";
-  text: string;
+  senderId?: string;
+  text?: string;
+  imageDataUrl?: string;
+  createdAt?: number;
+  recalled?: boolean;
+  hiddenForUserIds?: string[];
 };
 
 export type Conversation = {
@@ -24,6 +30,30 @@ export type ConversationInput = Omit<
 >;
 
 const conversationsKey = "studentCarryConversations";
+export const currentUserId = "me";
+
+function messageId() {
+  return `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function normalizeMessage(message: ConversationMessage, index: number): ConversationMessage {
+  return {
+    ...message,
+    id: message.id || `legacy-${index}`,
+    senderId: message.senderId || (message.author === "Me" ? currentUserId : "other-user"),
+    createdAt: message.createdAt || 0,
+    recalled: Boolean(message.recalled),
+    hiddenForUserIds: message.hiddenForUserIds || [],
+  };
+}
+
+function normalizeConversation(conversation: Conversation): Conversation {
+  return {
+    ...conversation,
+    status: conversation.status === "Matched" ? "Matched" : "Open",
+    messages: conversation.messages.map(normalizeMessage),
+  };
+}
 
 function canUseStorage() {
   return typeof window !== "undefined";
@@ -35,7 +65,9 @@ export function getConversations() {
   }
 
   try {
-    return JSON.parse(window.localStorage.getItem(conversationsKey) || "[]") as Conversation[];
+    return (JSON.parse(window.localStorage.getItem(conversationsKey) || "[]") as Conversation[]).map(
+      normalizeConversation,
+    );
   } catch {
     return [];
   }
@@ -70,12 +102,18 @@ export function createOrOpenConversation(input: ConversationInput) {
     unread: true,
     messages: [
       {
+        id: messageId(),
         author: "Me",
+        senderId: currentUserId,
         text: "Hi, I would like to discuss this post.",
+        createdAt: Date.now() - 180_000,
       },
       {
+        id: messageId(),
         author: "Post owner",
+        senderId: "other-user",
         text: "Sure, we can confirm the details here.",
+        createdAt: Date.now() - 170_000,
       },
     ],
   };
@@ -92,19 +130,107 @@ export function markConversationRead(id: string) {
   );
 }
 
-export function appendConversationMessage(id: string, text: string) {
+function latestPreviewFor(messages: ConversationMessage[]) {
+  const visibleMessages = messages.filter(
+    (message) => !message.hiddenForUserIds?.includes(currentUserId),
+  );
+  const latest = visibleMessages[visibleMessages.length - 1];
+  if (!latest) {
+    return "";
+  }
+
+  if (latest.recalled) {
+    return "Message recalled";
+  }
+
+  return latest.text || (latest.imageDataUrl ? "Sent an image" : "");
+}
+
+export function appendConversationMessage(id: string, text?: string, imageDataUrl?: string) {
   const conversations = getConversations();
   const next = conversations.map((conversation) =>
     conversation.id === id
       ? {
           ...conversation,
-          latestPreview: text,
+          latestPreview: text || (imageDataUrl ? "Sent an image" : conversation.latestPreview),
           latestTime: "Now",
           unread: false,
-          messages: [...conversation.messages, { author: "Me" as const, text }],
+          messages: [
+            ...conversation.messages,
+            {
+              id: messageId(),
+              author: "Me" as const,
+              senderId: currentUserId,
+              text,
+              imageDataUrl,
+              createdAt: Date.now(),
+              recalled: false,
+              hiddenForUserIds: [],
+            },
+          ],
         }
       : conversation,
   );
+
+  writeConversations(next);
+  return next.find((conversation) => conversation.id === id) ?? null;
+}
+
+export function appendConversationImageMessage(id: string, imageDataUrl: string) {
+  return appendConversationMessage(id, undefined, imageDataUrl);
+}
+
+export function hideConversationMessageForMe(id: string, messageIdToHide: string) {
+  const conversations = getConversations();
+  const next = conversations.map((conversation) => {
+    if (conversation.id !== id) {
+      return conversation;
+    }
+
+    const messages = conversation.messages.map((message) =>
+      message.id === messageIdToHide
+        ? {
+            ...message,
+            hiddenForUserIds: Array.from(new Set([...(message.hiddenForUserIds || []), currentUserId])),
+          }
+        : message,
+    );
+    return {
+      ...conversation,
+      latestPreview: latestPreviewFor(messages),
+      latestTime: messages.length ? conversation.latestTime : "Now",
+      messages,
+    };
+  });
+
+  writeConversations(next);
+  return next.find((conversation) => conversation.id === id) ?? null;
+}
+
+export function recallConversationMessage(id: string, messageIdToRecall: string) {
+  const conversations = getConversations();
+  const next = conversations.map((conversation) => {
+    if (conversation.id !== id) {
+      return conversation;
+    }
+
+    const messages = conversation.messages.map((message) =>
+      message.id === messageIdToRecall
+        ? {
+            ...message,
+            text: undefined,
+            imageDataUrl: undefined,
+            recalled: true,
+            hiddenForUserIds: [],
+          }
+        : message,
+    );
+    return {
+      ...conversation,
+      latestPreview: latestPreviewFor(messages),
+      messages,
+    };
+  });
 
   writeConversations(next);
   return next.find((conversation) => conversation.id === id) ?? null;

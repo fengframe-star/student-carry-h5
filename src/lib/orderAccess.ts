@@ -1,32 +1,49 @@
 import { getConversations, updateConversationStatus } from "./conversations";
-import { profileNickname } from "./profile";
+import { profileNickname, readStoredProfile } from "./profile";
 import type { Submission, SubmissionStatus } from "../types";
 
-export function isMatchedStatus(status?: SubmissionStatus | string) {
-  return status === "Matched" || status === "Closed";
-}
+const localDemoOwnerNames = new Set([
+  "Student Carry User",
+  "Gmail User",
+  "Google User",
+  "Apple User",
+  "WeChat User",
+  "Alipay User",
+]);
 
-export function isCompletedStatus(status?: SubmissionStatus | string) {
-  return status === "Completed";
+export function isMatchedStatus(status?: SubmissionStatus | string) {
+  return status === "Matched" || status === "Closed" || status === "Completed";
 }
 
 export function publicStatusLabel(status?: SubmissionStatus | string) {
-  if (isCompletedStatus(status)) {
-    return "已完成 / Completed";
+  if (isMatchedStatus(status)) {
+    return "Matched";
   }
 
-  return isMatchedStatus(status) ? "已匹配 / Matched" : status || "Open";
+  return "Open";
+}
+
+export function localizedStatusLabel(status: SubmissionStatus | string | undefined, _language: "en" | "zh" = "en") {
+  const normalized = publicStatusLabel(status);
+  const labels: Record<string, string> = {
+    Open: "Open",
+    Matched: "Matched",
+  };
+
+  return labels[normalized] || normalized;
 }
 
 export function isOpenStatus(status?: SubmissionStatus | string) {
-  return !status || status === "Open";
+  return !isMatchedStatus(status);
 }
 
 export function isCurrentUserPostOwner(submission: Submission) {
   const nickname = profileNickname();
+  const postOwner = submission.ownerNickname || submission.name;
+  const hasLocalProfile = Boolean(readStoredProfile());
   return Boolean(
     nickname &&
-      (submission.ownerNickname === nickname || submission.name === nickname),
+      (postOwner === nickname || (hasLocalProfile && localDemoOwnerNames.has(postOwner))),
   );
 }
 

@@ -1,11 +1,6 @@
 export const STATUSES = [
   "Open",
-  "Negotiating",
   "Matched",
-  "In Transit",
-  "Closed",
-  "Completed",
-  "Cancelled",
 ] as const;
 
 export type SubmissionStatus = (typeof STATUSES)[number];
@@ -40,6 +35,7 @@ export interface RequestSubmission {
   toLocation: string;
   itemName: string;
   itemCategory?: ItemCategory;
+  itemPhotoDataUrl?: string;
   estimatedValueEur: number;
   desiredDeliveryDate: string;
   budgetEur: number;
