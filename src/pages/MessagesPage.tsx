@@ -24,8 +24,8 @@ const messageCards = [
     icon: Clock3,
     titleCn: "交易时间确认",
     titleEn: "Exchange time confirmation",
-    bodyCn: "确认到达时间、交接窗口和延误处理方式。",
-    bodyEn: "Confirm arrival time, handoff window, and delay handling.",
+    bodyCn: "确认到达时间、交接方式等。",
+    bodyEn: "Confirm arrival time, handoff, and delivery details.",
   },
 ];
 
@@ -133,7 +133,7 @@ export default function MessagesPage() {
             return (
               <article
                 key={card.titleEn}
-                className="how-stack-card absolute left-1/2 top-0 h-[58px] w-[74%] max-w-[306px] overflow-hidden rounded-[18px] border border-white/10 bg-[#171b2b]/95 px-2.5 py-2 shadow-xl backdrop-blur"
+                className="how-stack-card absolute left-1/2 top-0 h-[58px] w-[92%] max-w-[480px] overflow-hidden rounded-[18px] border border-white/10 bg-[#171b2b]/95 px-2.5 py-2 shadow-xl backdrop-blur"
                 style={cardStyle}
               >
                 <div className="flex items-start justify-between gap-2">
