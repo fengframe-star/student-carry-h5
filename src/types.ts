@@ -27,6 +27,7 @@ export interface RequestSubmission {
   id: string;
   type: "request";
   name: string;
+  ownerId?: string;
   ownerNickname?: string;
   contact: string;
   fromCountry?: string;
@@ -52,6 +53,7 @@ export interface CarrierSubmission {
   id: string;
   type: "carrier";
   name: string;
+  ownerId?: string;
   ownerNickname?: string;
   contact: string;
   fromCountry?: string;

@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { MessageCircle } from "lucide-react";
 import BackButton from "../components/BackButton";
 import { createOrOpenConversation } from "../lib/conversations";
-import { isFirebaseConfigured } from "../lib/firebase";
 import { itemCategoryLabel } from "../lib/matching";
 import { formatPostedTime } from "../utils/time";
 import { cityLabel } from "../lib/cities";
@@ -21,7 +20,6 @@ import type { RequestSubmission } from "../types";
 export default function RequestDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const { language, t } = useLanguage();
   const [request, setRequest] = useState<RequestSubmission | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,9 +41,7 @@ export default function RequestDetailPage() {
 
   const canOpen = request ? canOpenSubmission(request) : false;
   const isMatched = request ? isMatchedStatus(request.status) : false;
-  const isOwner = request
-    ? isCurrentUserPostOwner(request) || searchParams.get("owner") === "1" || (!isFirebaseConfigured && !isMatched)
-    : false;
+  const isOwner = request ? isCurrentUserPostOwner(request) : false;
   const requestInfoItems = request
     ? [
         request.budgetEur ? { label: t("Budget", "预算"), value: `€${request.budgetEur}`, highlight: true } : null,
@@ -80,9 +76,9 @@ export default function RequestDetailPage() {
   }
 
   return (
-    <section className="mx-auto max-w-3xl px-4 pb-32 pt-8 sm:px-6 sm:pb-24 sm:pt-12">
+    <section className="mx-auto max-w-3xl px-4 pb-28 pt-5 sm:px-6 sm:pb-20 sm:pt-8">
       <BackButton fallback="/market" />
-      <div className="relative rounded-[28px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
+      <div className="relative rounded-[22px] border border-white/10 bg-[#1f2232]/90 p-3.5 shadow-xl">
         <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{t("Request listing", "帮我带发布")}</p>
         {loading ? (
           <p className="mt-5 text-slate-400">{t("Loading...", "加载中...")}</p>
@@ -113,8 +109,8 @@ export default function RequestDetailPage() {
                 </button>
               </div>
             ) : null}
-            <h1 className="mt-3 pr-28 text-3xl font-black leading-tight text-white sm:text-4xl">{request.itemName || t("Item", "物品")}</h1>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm font-bold text-slate-300">
+            <h1 className="mt-2 pr-28 text-xl font-black leading-tight text-white sm:text-2xl">{request.itemName || t("Item", "物品")}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs font-bold text-slate-300">
               <span className="text-sky-200">
                 {routeText(request.fromLocation, request.toLocation, language)}
               </span>
@@ -143,7 +139,7 @@ export default function RequestDetailPage() {
               </div>
             ) : null}
             {requestInfoItems.length ? (
-              <div className="mt-5 grid grid-cols-2 gap-2.5">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 {requestInfoItems.map((item) => (
                   <InfoCard key={item.label} label={item.label} value={item.value} highlight={item.highlight} />
                 ))}
@@ -167,7 +163,7 @@ export default function RequestDetailPage() {
               <button
                 type="button"
                 onClick={handleCancelMatch}
-                className="pressable mt-5 w-full rounded-2xl border border-red-300/25 bg-red-500/10 px-4 py-3 text-sm font-black text-red-100"
+                className="pressable mt-3 w-full rounded-xl border border-red-300/25 bg-red-500/10 px-3 py-2 text-xs font-black text-red-100"
               >
                 {t("Cancel Match", "取消匹配")}
               </button>
@@ -190,6 +186,7 @@ export default function RequestDetailPage() {
           const conversation = createOrOpenConversation({
             postType: "request",
             postId: request.id,
+            postOwnerId: request.ownerId || request.ownerNickname || request.name,
             otherUserName: request.ownerNickname || request.name || t("User", "用户"),
             item: request.itemName || t("Item", "物品"),
             route: routeText(request.fromLocation, request.toLocation, language) || t("Route pending", "路线待定"),
@@ -205,16 +202,16 @@ export default function RequestDetailPage() {
 
 function InfoCard({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-[18px] border border-white/10 px-3 py-2.5 ${highlight ? "bg-sky-400/10" : "bg-white/[0.045]"}`}>
+    <div className={`rounded-[14px] border border-white/10 px-2.5 py-2 ${highlight ? "bg-sky-400/10" : "bg-white/[0.045]"}`}>
       <p className="text-[0.68rem] font-bold text-slate-500">{label}</p>
-      <p className={`mt-1 text-sm font-black leading-5 ${highlight ? "text-sky-100" : "text-white"}`}>{value}</p>
+      <p className={`mt-0.5 text-xs font-black leading-4 ${highlight ? "text-sky-100" : "text-white"}`}>{value}</p>
     </div>
   );
 }
 
 function Tag({ children }: { children: string }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.055] px-3 py-1.5 text-xs font-bold text-slate-200">
+    <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.055] px-2.5 py-1 text-[0.68rem] font-bold text-slate-200">
       {children}
     </span>
   );
@@ -246,7 +243,7 @@ function ContactNowButton({
           type="button"
           disabled={disabled}
           onClick={onContact}
-          className="pressable flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#38bdf8] px-4 text-sm font-black text-white shadow-2xl shadow-sky-950/40 disabled:opacity-50"
+          className="pressable flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#38bdf8] px-3 text-xs font-black text-white shadow-xl shadow-sky-950/40 disabled:opacity-50"
         >
           <MessageCircle size={18} />
           <span>{label}</span>

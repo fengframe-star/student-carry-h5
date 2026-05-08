@@ -1,4 +1,5 @@
 export type StoredProfile = {
+  ownerId?: string;
   name?: string;
   firstName?: string;
   lastName?: string;
@@ -14,6 +15,7 @@ export type StoredProfile = {
 };
 
 const profileKey = "studentCarryProfile";
+const anonymousOwnerKey = "studentCarryAnonymousOwnerId";
 
 export function readStoredProfile(): StoredProfile | null {
   if (typeof window === "undefined") {
@@ -31,4 +33,37 @@ export function readStoredProfile(): StoredProfile | null {
 export function profileNickname() {
   const profile = readStoredProfile();
   return profile?.nickname || profile?.name || profile?.firstName || "Student Carry User";
+}
+
+function makeOwnerId(prefix = "local") {
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export function ownerIdForProfile(profile: Pick<StoredProfile, "ownerId" | "email" | "provider" | "nickname">) {
+  if (profile.ownerId) {
+    return profile.ownerId;
+  }
+
+  const basis = [profile.provider, profile.email || profile.nickname].filter(Boolean).join(":");
+  return basis ? `profile:${basis}` : makeOwnerId("profile");
+}
+
+export function currentOwnerId() {
+  const profile = readStoredProfile();
+  if (profile) {
+    return ownerIdForProfile(profile);
+  }
+
+  if (typeof window === "undefined") {
+    return "anonymous";
+  }
+
+  const existing = window.localStorage.getItem(anonymousOwnerKey);
+  if (existing) {
+    return existing;
+  }
+
+  const next = makeOwnerId("anonymous");
+  window.localStorage.setItem(anonymousOwnerKey, next);
+  return next;
 }

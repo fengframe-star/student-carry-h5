@@ -15,7 +15,7 @@ export default function BackButton({ fallback = "/" }: { fallback?: string }) {
           navigate(fallback);
         }
       }}
-      className="pressable mb-5 inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-4 text-sm font-black text-white"
+      className="pressable mb-3 inline-flex min-h-9 items-center justify-center rounded-xl border border-white/15 bg-white/10 px-3 text-xs font-black text-white"
     >
       ← {t("Back", "返回")}
     </button>

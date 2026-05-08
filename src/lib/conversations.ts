@@ -1,3 +1,5 @@
+import { currentOwnerId } from "./profile";
+
 export type ConversationMessage = {
   id?: string;
   author: "Post owner" | "Me";
@@ -18,9 +20,13 @@ export type Conversation = {
   route: string;
   reward: string;
   status: string;
+  postOwnerId?: string;
+  starterUserId?: string;
+  matchConfirmations?: string[];
   latestPreview: string;
   latestTime: string;
   unread: boolean;
+  hiddenForUserIds?: string[];
   messages: ConversationMessage[];
 };
 
@@ -51,6 +57,9 @@ function normalizeConversation(conversation: Conversation): Conversation {
   return {
     ...conversation,
     status: conversation.status === "Matched" ? "Matched" : "Open",
+    starterUserId: conversation.starterUserId || currentUserId,
+    matchConfirmations: conversation.matchConfirmations || [],
+    hiddenForUserIds: conversation.hiddenForUserIds || [],
     messages: conversation.messages.map(normalizeMessage),
   };
 }
@@ -97,6 +106,8 @@ export function createOrOpenConversation(input: ConversationInput) {
   const conversation: Conversation = {
     ...input,
     id,
+    starterUserId: currentOwnerId(),
+    matchConfirmations: [],
     latestPreview: "Hi, I would like to discuss this post.",
     latestTime: "Just now",
     unread: true,
@@ -130,9 +141,9 @@ export function markConversationRead(id: string) {
   );
 }
 
-function latestPreviewFor(messages: ConversationMessage[]) {
+function latestPreviewFor(messages: ConversationMessage[], viewerId = currentOwnerId()) {
   const visibleMessages = messages.filter(
-    (message) => !message.hiddenForUserIds?.includes(currentUserId),
+    (message) => !message.hiddenForUserIds?.includes(viewerId),
   );
   const latest = visibleMessages[visibleMessages.length - 1];
   if (!latest) {
@@ -182,6 +193,7 @@ export function appendConversationImageMessage(id: string, imageDataUrl: string)
 
 export function hideConversationMessageForMe(id: string, messageIdToHide: string) {
   const conversations = getConversations();
+  const viewerId = currentOwnerId();
   const next = conversations.map((conversation) => {
     if (conversation.id !== id) {
       return conversation;
@@ -191,13 +203,13 @@ export function hideConversationMessageForMe(id: string, messageIdToHide: string
       message.id === messageIdToHide
         ? {
             ...message,
-            hiddenForUserIds: Array.from(new Set([...(message.hiddenForUserIds || []), currentUserId])),
+            hiddenForUserIds: Array.from(new Set([...(message.hiddenForUserIds || []), viewerId])),
           }
         : message,
     );
     return {
       ...conversation,
-      latestPreview: latestPreviewFor(messages),
+      latestPreview: latestPreviewFor(messages, viewerId),
       latestTime: messages.length ? conversation.latestTime : "Now",
       messages,
     };
@@ -205,6 +217,21 @@ export function hideConversationMessageForMe(id: string, messageIdToHide: string
 
   writeConversations(next);
   return next.find((conversation) => conversation.id === id) ?? null;
+}
+
+export function hideConversationForMe(id: string) {
+  const viewerId = currentOwnerId();
+  const next = getConversations().map((conversation) =>
+    conversation.id === id
+      ? {
+          ...conversation,
+          hiddenForUserIds: Array.from(new Set([...(conversation.hiddenForUserIds || []), viewerId])),
+        }
+      : conversation,
+  );
+
+  writeConversations(next);
+  return next;
 }
 
 export function recallConversationMessage(id: string, messageIdToRecall: string) {
@@ -243,6 +270,55 @@ export function updateConversationStatus(id: string, status: string) {
       ? {
           ...conversation,
           status,
+          matchConfirmations: status === "Open" ? [] : conversation.matchConfirmations,
+        }
+      : conversation,
+  );
+
+  writeConversations(next);
+  return next.find((conversation) => conversation.id === id) ?? null;
+}
+
+export function confirmConversationMatch(id: string, confirmerId = currentOwnerId()) {
+  const conversations = getConversations();
+  let matchedPostId: string | null = null;
+  const next = conversations.map((conversation) => {
+    if (conversation.id !== id) {
+      return conversation;
+    }
+
+    const confirmations = Array.from(
+      new Set([...(conversation.matchConfirmations || []), confirmerId]),
+    );
+    const required = [conversation.postOwnerId, conversation.starterUserId].filter(Boolean) as string[];
+    const matched = required.length >= 2 && required.every((requiredId) => confirmations.includes(requiredId));
+    if (matched) {
+      matchedPostId = conversation.postId;
+    }
+
+    return {
+      ...conversation,
+      status: matched ? "Matched" : "Open",
+      matchConfirmations: confirmations,
+    };
+  });
+
+  writeConversations(next);
+  return {
+    conversation: next.find((conversation) => conversation.id === id) ?? null,
+    matched: Boolean(matchedPostId),
+    postId: matchedPostId,
+  };
+}
+
+export function cancelConversationMatch(id: string) {
+  const conversations = getConversations();
+  const next = conversations.map((conversation) =>
+    conversation.id === id
+      ? {
+          ...conversation,
+          status: "Open",
+          matchConfirmations: [],
         }
       : conversation,
   );

@@ -55,12 +55,12 @@ export default function RegisterPage() {
   }
 
   return (
-    <section className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
+    <section className="mx-auto max-w-3xl px-4 py-4 sm:px-6 sm:py-6">
       <BackButton fallback="/my" />
-      <div className="mb-5 rounded-[26px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
+      <div className="mb-3 rounded-[22px] border border-white/10 bg-[#1f2232]/90 p-3.5 shadow-xl">
         <p className="text-xs font-bold text-slate-400">{t("Student registration", "学生注册")}</p>
-        <h1 className="mt-2 text-3xl font-black text-white">{t("Register", "注册")}</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-300">
+        <h1 className="mt-2 text-base font-black text-white">{t("Register", "注册")}</h1>
+        <p className="mt-1 text-xs leading-5 text-slate-300">
           {t("Create your basic profile. Identity verification is optional in this mock flow.", "创建基础资料。当前模拟流程中身份验证为可选。")}
         </p>
       </div>
@@ -81,27 +81,27 @@ export default function RegisterPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="grid gap-5 rounded-[32px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl sm:p-6">
-        <div className="grid gap-5 sm:grid-cols-2">
+      <form onSubmit={handleSubmit} className="grid gap-3 rounded-[24px] border border-white/10 bg-[#1f2232]/90 p-3.5 shadow-xl sm:p-4">
+        <div className="grid gap-3 sm:grid-cols-2">
           <FormField id="firstName" label={t("First name", "名")} required value={form.firstName} onChange={(event) => setForm({ ...form, firstName: event.target.value })} />
           <FormField id="lastName" label={t("Last name", "姓")} required value={form.lastName} onChange={(event) => setForm({ ...form, lastName: event.target.value })} />
         </div>
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           <FormField id="nickname" label={t("Nickname", "昵称")} required value={form.nickname} onChange={(event) => setForm({ ...form, nickname: event.target.value })} />
           <FormField id="email" label={t("Email", "邮箱")} type="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
         </div>
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           <FormField id="phoneNumber" label={t("Phone number", "手机号")} value={form.phoneNumber} onChange={(event) => setForm({ ...form, phoneNumber: event.target.value })} />
           <FormField id="currentCity" label={t("Current city", "当前城市")} required value={form.currentCity} onChange={(event) => setForm({ ...form, currentCity: event.target.value })} />
         </div>
         <FormField id="schoolOrUniversity" label={t("School or university (optional)", "学校或大学（选填）")} value={form.schoolOrUniversity} onChange={(event) => setForm({ ...form, schoolOrUniversity: event.target.value })} />
         {form.schoolOrUniversity ? (
-          <p className="rounded-2xl bg-sky-400/15 px-4 py-3 text-sm font-black text-sky-100">
+          <p className="rounded-xl bg-sky-400/15 px-3 py-2 text-xs font-black text-sky-100">
             {t("Student verification option available", "可进行学生认证")}
           </p>
         ) : null}
         <label htmlFor="verificationLater" className="block">
-          <span className="whitespace-pre-line text-sm font-semibold leading-6 text-slate-100">
+          <span className="whitespace-pre-line text-xs font-semibold leading-5 text-slate-100">
             {t("Willing to complete identity verification later?", "是否愿意后续完成身份验证？")}
           </span>
           <select
@@ -113,7 +113,7 @@ export default function RegisterPage() {
                 verificationLater: event.target.value as VerificationLater,
               })
             }
-            className="mt-2 w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none focus:border-[#38bdf8] focus:ring-4 focus:ring-sky-400/10"
+            className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8] focus:ring-4 focus:ring-sky-400/10"
           >
             {verificationOptions.map((option) => (
               <option key={option} value={option}>
@@ -122,7 +122,7 @@ export default function RegisterPage() {
             ))}
           </select>
         </label>
-        <label className="flex gap-3 rounded-[24px] bg-sky-400/10 p-4 text-sm leading-6 text-slate-200">
+        <label className="flex gap-2 rounded-[18px] bg-sky-400/10 p-3 text-xs leading-5 text-slate-200">
           <input
             type="checkbox"
             checked={form.identityVerified}
@@ -137,7 +137,7 @@ export default function RegisterPage() {
         <button
           type="submit"
           disabled={state === "submitting"}
-          className="min-h-14 rounded-2xl bg-[#38bdf8] px-5 py-3 text-sm font-black text-white transition hover:bg-[#0ea5e9] disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-h-11 rounded-xl bg-[#38bdf8] px-4 py-2 text-xs font-black text-white transition hover:bg-[#0ea5e9] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {state === "submitting" ? t("Submitting...", "提交中...") : t("Submit registration", "提交注册")}
         </button>

@@ -72,7 +72,7 @@ export default function LandingPage() {
         <p className="mt-5 text-base leading-8 text-slate-300">
           {t(
             "Post requests, match with travelers, and chat about handoff details.",
-            "发布需求，匹配顺路同学，在线沟通交接细节。",
+            "发布需求，匹配顺路同学，在线沟通细节。",
           )}
         </p>
         <div className="mt-8 grid grid-cols-2 gap-3">
@@ -319,9 +319,9 @@ function InfoCard({
       : "border-fuchsia-500/20 bg-[radial-gradient(circle_at_20%_0%,rgba(168,85,247,0.20),transparent_34%),radial-gradient(circle_at_80%_100%,rgba(239,68,68,0.14),transparent_34%),rgba(31,34,50,0.92)]";
 
   return (
-    <section className={`mt-5 rounded-[32px] border p-5 shadow-2xl ${toneClass}`}>
-      <h2 className="text-xl font-black text-white">{t(titleEn, titleCn)}</h2>
-      <p className="mt-4 text-sm leading-7 text-slate-300">{t(bodyEn, bodyCn)}</p>
+    <section className={`mt-4 rounded-[24px] border p-3.5 shadow-xl ${toneClass}`}>
+      <h2 className="text-base font-black text-white">{t(titleEn, titleCn)}</h2>
+      <p className="mt-2 text-xs leading-5 text-slate-300">{t(bodyEn, bodyCn)}</p>
     </section>
   );
 }

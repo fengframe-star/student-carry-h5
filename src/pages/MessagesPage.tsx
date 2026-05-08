@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { BadgeEuro, Clock3, MapPin } from "lucide-react";
-import { getConversations } from "../lib/conversations";
+import { currentUserId, getConversations, hideConversationForMe, type Conversation } from "../lib/conversations";
 import { useLanguage } from "../lib/language";
+import { currentOwnerId } from "../lib/profile";
 
 const messageCards = [
   {
@@ -30,9 +31,13 @@ const messageCards = [
 
 export default function MessagesPage() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [activeCard, setActiveCard] = useState(0);
-  const [conversations, setConversations] = useState(() => getConversations());
+  const [conversations, setConversations] = useState(() => visibleConversations());
   const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [rowSwipe, setRowSwipe] = useState<{ id: string; startX: number; offset: number } | null>(null);
+  const [openDeleteId, setOpenDeleteId] = useState<string | null>(null);
+  const [suppressClickId, setSuppressClickId] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -43,7 +48,7 @@ export default function MessagesPage() {
   }, []);
 
   useEffect(() => {
-    setConversations(getConversations());
+    setConversations(visibleConversations());
   }, []);
 
   function goToCard(direction: 1 | -1) {
@@ -62,12 +67,42 @@ export default function MessagesPage() {
     setTouchStart(null);
   }
 
+  function startRowSwipe(id: string, clientX: number) {
+    setRowSwipe({ id, startX: clientX, offset: openDeleteId === id ? -68 : 0 });
+  }
+
+  function moveRowSwipe(clientX: number) {
+    if (!rowSwipe) return;
+    const base = openDeleteId === rowSwipe.id ? -68 : 0;
+    const offset = Math.max(-76, Math.min(0, base + clientX - rowSwipe.startX));
+    setRowSwipe({ ...rowSwipe, offset });
+  }
+
+  function finishRowSwipe() {
+    if (!rowSwipe) return;
+    if (rowSwipe.offset <= -42) {
+      setOpenDeleteId(rowSwipe.id);
+      setSuppressClickId(rowSwipe.id);
+      setRowSwipe({ ...rowSwipe, offset: -68 });
+    } else {
+      setOpenDeleteId((current) => (current === rowSwipe.id ? null : current));
+      setRowSwipe(null);
+    }
+  }
+
+  function deleteConversation(id: string) {
+    hideConversationForMe(id);
+    setConversations(visibleConversations());
+    setOpenDeleteId(null);
+    setRowSwipe(null);
+  }
+
   return (
     <section className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
-      <div className="rounded-[26px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
+      <div className="rounded-[22px] border border-white/10 bg-[#1f2232]/90 p-3.5 shadow-xl">
         <p className="text-xs font-bold text-slate-400">{t("Negotiation", "协商")}</p>
-        <h1 className="mt-2 text-3xl font-black text-white">{t("Messages", "消息")}</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-300">
+        <h1 className="mt-1 text-xl font-black text-white">{t("Messages", "消息")}</h1>
+        <p className="mt-1 text-xs leading-5 text-slate-300">
           {t("Confirm price, place, timing, and handoff details.", "确认价格、地点、时间和交接细节。")}
         </p>
       </div>
@@ -131,37 +166,74 @@ export default function MessagesPage() {
       </div>
 
       {conversations.length > 0 ? (
-        <div className="mt-5 grid gap-3">
-          {conversations.map((conversation) => (
-            <Link
-              to={`/messages/${conversation.id}`}
-              key={conversation.id}
-              className="pressable relative flex items-center gap-3 rounded-[24px] border border-white/10 bg-[#1f2232]/90 p-4 shadow-2xl transition hover:border-sky-300/25 hover:bg-[#24283a]"
-            >
-              {conversation.unread ? <span className="unread-dot" /> : null}
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-sky-300/15 text-sm font-black text-sky-100 ring-1 ring-sky-300/25">
-                {conversation.otherUserName.charAt(0)}
+        <div className="mt-4 grid gap-2">
+          {conversations.map((conversation) => {
+            const activeSwipe = rowSwipe?.id === conversation.id ? rowSwipe : null;
+            const offset = activeSwipe ? activeSwipe.offset : openDeleteId === conversation.id ? -68 : 0;
+
+            return (
+              <div key={conversation.id} className="relative overflow-hidden rounded-[18px]">
+                <button
+                  type="button"
+                  onClick={() => deleteConversation(conversation.id)}
+                  className="absolute bottom-0 right-0 top-0 flex w-16 items-center justify-center rounded-[18px] bg-red-500/90 text-[0.68rem] font-black text-white"
+                >
+                  {t("Delete", "删除")}
+                </button>
+                <article
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    if (suppressClickId === conversation.id) {
+                      setSuppressClickId(null);
+                      return;
+                    }
+                    if (openDeleteId === conversation.id) {
+                      setOpenDeleteId(null);
+                      return;
+                    }
+                    navigate(`/messages/${conversation.id}`);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      navigate(`/messages/${conversation.id}`);
+                    }
+                  }}
+                  onPointerDown={(event) => startRowSwipe(conversation.id, event.clientX)}
+                  onPointerMove={(event) => moveRowSwipe(event.clientX)}
+                  onPointerUp={finishRowSwipe}
+                  onPointerCancel={finishRowSwipe}
+                  onPointerLeave={finishRowSwipe}
+                  style={{ transform: `translateX(${offset}px)` }}
+                  className="pressable relative flex cursor-pointer items-center gap-2 rounded-[18px] border border-white/10 bg-[#1f2232]/90 p-2.5 shadow-xl transition hover:border-sky-300/25 hover:bg-[#24283a]"
+                >
+                  {conversation.unread ? <span className="unread-dot" /> : null}
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-300/15 text-xs font-black text-sky-100 ring-1 ring-sky-300/25">
+                    {conversation.otherUserName.charAt(0)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h2 className="truncate text-xs font-black text-white">{conversation.otherUserName}</h2>
+                      <span className="truncate text-[0.65rem] text-slate-500">{conversation.latestTime}</span>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs font-semibold text-slate-300">
+                      {conversation.item} · {conversation.route}
+                    </p>
+                    <p className="mt-0.5 truncate text-[0.68rem] text-slate-500">{conversation.latestPreview}</p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-sky-400/15 px-2 py-0.5 text-[0.68rem] font-black text-sky-100">
+                    {conversation.reward}
+                  </span>
+                </article>
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <h2 className="truncate text-sm font-black text-white">{conversation.otherUserName}</h2>
-                  <span className="truncate text-xs text-slate-500">{conversation.latestTime}</span>
-                </div>
-                <p className="mt-1 truncate text-sm font-semibold text-slate-300">
-                  {conversation.item} · {conversation.route}
-                </p>
-                <p className="mt-1 truncate text-xs text-slate-500">{conversation.latestPreview}</p>
-              </div>
-              <span className="shrink-0 rounded-full bg-sky-400/15 px-3 py-1 text-xs font-black text-sky-100">
-                {conversation.reward}
-              </span>
-            </Link>
-          ))}
+            );
+          })}
         </div>
       ) : (
-        <div className="mt-5 rounded-[28px] border border-white/10 bg-[#1f2232]/90 p-6 text-center shadow-2xl">
-          <h2 className="text-lg font-black text-white">{t("No messages yet", "暂无消息")}</h2>
-          <p className="mt-4 text-sm leading-6 text-slate-300">
+        <div className="mt-4 rounded-[22px] border border-white/10 bg-[#1f2232]/90 p-4 text-center shadow-xl">
+          <h2 className="text-sm font-black text-white">{t("No messages yet", "暂无消息")}</h2>
+          <p className="mt-2 text-xs leading-5 text-slate-300">
             {t(
               "Conversations will appear here after you contact a post owner.",
               "当你联系订单发布者后，对话会显示在这里。",
@@ -170,5 +242,14 @@ export default function MessagesPage() {
         </div>
       )}
     </section>
+  );
+}
+
+function visibleConversations(): Conversation[] {
+  const ownerId = currentOwnerId();
+  return getConversations().filter(
+    (conversation) =>
+      !conversation.hiddenForUserIds?.includes(ownerId) &&
+      !conversation.hiddenForUserIds?.includes(currentUserId),
   );
 }

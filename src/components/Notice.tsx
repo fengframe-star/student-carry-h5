@@ -12,9 +12,9 @@ const tones = {
 
 export default function Notice({ title, children, tone = "info" }: NoticeProps) {
   return (
-    <div className={`rounded-3xl border p-4 ${tones[tone]}`}>
-      <p className="font-semibold">{title}</p>
-      <p className="mt-1 whitespace-pre-line text-sm leading-6">{children}</p>
+    <div className={`rounded-2xl border p-3 ${tones[tone]}`}>
+      <p className="text-sm font-semibold">{title}</p>
+      <p className="mt-1 whitespace-pre-line text-xs leading-5">{children}</p>
     </div>
   );
 }

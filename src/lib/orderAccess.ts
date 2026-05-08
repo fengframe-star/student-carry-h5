@@ -1,15 +1,6 @@
 import { getConversations, updateConversationStatus } from "./conversations";
-import { profileNickname, readStoredProfile } from "./profile";
+import { currentOwnerId, profileNickname } from "./profile";
 import type { Submission, SubmissionStatus } from "../types";
-
-const localDemoOwnerNames = new Set([
-  "Student Carry User",
-  "Gmail User",
-  "Google User",
-  "Apple User",
-  "WeChat User",
-  "Alipay User",
-]);
 
 export function isMatchedStatus(status?: SubmissionStatus | string) {
   return status === "Matched" || status === "Closed" || status === "Completed";
@@ -40,15 +31,26 @@ export function isOpenStatus(status?: SubmissionStatus | string) {
 export function isCurrentUserPostOwner(submission: Submission) {
   const nickname = profileNickname();
   const postOwner = submission.ownerNickname || submission.name;
-  const hasLocalProfile = Boolean(readStoredProfile());
+  const ownerId = currentOwnerId();
   return Boolean(
-    nickname &&
-      (postOwner === nickname || (hasLocalProfile && localDemoOwnerNames.has(postOwner))),
+    (submission.ownerId && submission.ownerId === ownerId) ||
+      (!submission.ownerId && nickname && postOwner === nickname),
   );
 }
 
 export function hasConversationForPost(submission: Submission) {
-  return getConversations().some((conversation) => conversation.postId === submission.id);
+  const ownerId = currentOwnerId();
+  return getConversations().some((conversation) => {
+    if (conversation.postId !== submission.id) {
+      return false;
+    }
+
+    if (!conversation.postOwnerId && !conversation.starterUserId) {
+      return true;
+    }
+
+    return conversation.postOwnerId === ownerId || conversation.starterUserId === ownerId;
+  });
 }
 
 export function canOpenSubmission(submission: Submission) {

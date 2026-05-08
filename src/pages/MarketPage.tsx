@@ -101,14 +101,14 @@ export default function MarketPage() {
         : visibleAll.length;
 
   return (
-    <section className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
-      <div className="rounded-[26px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
+    <section className="mx-auto max-w-3xl px-4 py-4 sm:px-6 sm:py-6">
+      <div className="rounded-[22px] border border-white/10 bg-[#1f2232]/90 p-3.5 shadow-xl">
         <p className="text-xs font-bold text-slate-400">Market</p>
-        <h1 className="mt-2 text-3xl font-black text-white">{t("Market", "匹配集市")}</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-300">
+        <h1 className="mt-1 text-xl font-black text-white">{t("Market", "匹配集市")}</h1>
+        <p className="mt-1 text-xs leading-5 text-slate-300">
           {t("Browse public requests and travel routes.", "浏览公开需求与顺路行程。")}
         </p>
-        <div className="mt-5 grid grid-cols-3 gap-3">
+        <div className="mt-3 grid grid-cols-3 gap-2">
           <button
             type="button"
             onClick={() => setActiveType("request")}
@@ -133,37 +133,37 @@ export default function MarketPage() {
         </div>
       </div>
 
-      <div className="mt-5 rounded-[28px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
+      <div className="mt-3 rounded-[22px] border border-white/10 bg-[#1f2232]/90 p-3.5 shadow-xl">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm text-slate-400">
+            <p className="text-xs text-slate-400">
               {search ? `${activeCount} / ${totalCount}` : `${totalCount}`} {t("posts", "条发布")}
             </p>
           </div>
           <Link
             to={publishTo}
-            className={`shrink-0 rounded-2xl bg-[#38bdf8] px-4 py-3 text-sm font-black text-white ${activeType === "all" ? "hidden" : ""}`}
+            className={`shrink-0 rounded-xl bg-[#38bdf8] px-3 py-2 text-xs font-black text-white ${activeType === "all" ? "hidden" : ""}`}
           >
             {t("Post", "发布需求")}
           </Link>
         </div>
 
-        <label className="mt-5 block">
-          <span className="text-sm font-semibold text-slate-100">{t("Search Routes", "搜索路线")}</span>
-          <span className="mt-1 block text-xs text-slate-500">
+        <label className="mt-3 block">
+          <span className="text-xs font-semibold text-slate-100">{t("Search Routes", "搜索路线")}</span>
+          <span className="mt-0.5 block text-[0.68rem] text-slate-500">
             {t("Search by city, country, or route", "按城市、国家与路线搜索")}
           </span>
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder={t("e.g. Xi'an → Paris", "例如：西安至巴黎")}
-            className="mt-3 w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-[#38bdf8]"
+            className="mt-2 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-[#38bdf8]"
           />
         </label>
       </div>
 
       {loading ? (
-        <div className="mt-5 rounded-[28px] border border-white/10 bg-[#1f2232]/90 p-5 text-slate-300">
+        <div className="mt-3 rounded-[20px] border border-white/10 bg-[#1f2232]/90 p-3 text-xs text-slate-300">
           {t("Loading...", "加载中...")}
         </div>
       ) : activeType === "all" ? (
@@ -266,7 +266,7 @@ function CarryCard({ item, index }: { item: CarrierSubmission; index: number }) 
 
 function tabButtonClass(active: boolean) {
   return [
-    "pressable min-h-14 rounded-2xl px-3 text-sm font-black transition",
+    "pressable min-h-10 rounded-xl px-2 text-xs font-black transition",
     active
       ? "bg-[#38bdf8] text-white"
       : "border border-white/15 bg-white/10 text-white",
@@ -326,11 +326,11 @@ function ListingGrid({
 
   if (isEmpty) {
     return (
-      <div className="mt-5 rounded-[28px] border border-white/10 bg-[#1f2232]/90 p-5 text-slate-400">
+      <div className="mt-3 rounded-[20px] border border-white/10 bg-[#1f2232]/90 p-3 text-xs text-slate-400">
         {emptyLabel}
       </div>
     );
   }
 
-  return <div className="mt-5 grid grid-cols-2 gap-3">{children}</div>;
+  return <div className="mt-3 grid grid-cols-2 gap-2">{children}</div>;
 }

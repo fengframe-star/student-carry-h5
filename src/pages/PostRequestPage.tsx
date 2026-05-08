@@ -9,7 +9,7 @@ import { readImageAsDataUrl } from "../lib/imageFiles";
 import { useLanguage } from "../lib/language";
 import { itemCategories, matchingCarriers } from "../lib/matching";
 import { createRequestSubmission, getSubmissions, updateSubmission } from "../lib/submissions";
-import { profileNickname } from "../lib/profile";
+import { currentOwnerId, profileNickname } from "../lib/profile";
 import type { CarrierSubmission, ChinaDomesticShipping, ItemCategory, RequestSubmission } from "../types";
 
 const chinaDomesticShippingOptions: ChinaDomesticShipping[] = [
@@ -20,6 +20,7 @@ const chinaDomesticShippingOptions: ChinaDomesticShipping[] = [
 
 const initialForm = {
   name: profileNickname(),
+  ownerId: currentOwnerId(),
   ownerNickname: profileNickname(),
   contact: "Platform messaging",
   fromCountry: "China" as CountryName,
@@ -80,10 +81,11 @@ export default function PostRequestPage() {
           ...initialForm,
           ...JSON.parse(saved),
           name: profileNickname(),
+          ownerId: currentOwnerId(),
           ownerNickname: profileNickname(),
         });
       } else {
-        setForm((current) => ({ ...current, name: profileNickname(), ownerNickname: profileNickname() }));
+        setForm((current) => ({ ...current, name: profileNickname(), ownerId: currentOwnerId(), ownerNickname: profileNickname() }));
       }
       return;
     }
@@ -132,6 +134,7 @@ export default function PostRequestPage() {
       const payload = {
         ...form,
         name: profileNickname(),
+        ownerId: currentOwnerId(),
         ownerNickname: profileNickname(),
         estimatedValueEur: Number(form.estimatedValueEur),
         budgetEur: Number(form.budgetEur),
@@ -158,12 +161,12 @@ export default function PostRequestPage() {
   }
 
   return (
-    <section className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">
+    <section className="mx-auto max-w-3xl px-4 py-4 sm:px-6 sm:py-6">
       <BackButton fallback="/" />
-      <div className="mb-5 rounded-[26px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl">
+      <div className="mb-3 rounded-[22px] border border-white/10 bg-[#1f2232]/90 p-3.5 shadow-xl">
         <p className="text-xs font-bold text-slate-400">Request</p>
-        <h1 className="mt-2 text-3xl font-black text-white">{editId ? t("Edit request", "编辑帮我带") : t("Post a request", "帮我带")}</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-300">
+        <h1 className="mt-2 text-base font-black text-white">{editId ? t("Edit request", "编辑帮我带") : t("Post a request", "帮我带")}</h1>
+        <p className="mt-1 text-xs leading-5 text-slate-300">
           {t(
             "Share route, item details, date, and reward.",
             "填写路线、物品信息、时间和预算。",
@@ -187,8 +190,8 @@ export default function PostRequestPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="grid gap-5 rounded-[32px] border border-white/10 bg-[#1f2232]/90 p-5 shadow-2xl sm:p-6">
-        <div className="grid gap-5 sm:grid-cols-2">
+      <form onSubmit={handleSubmit} className="grid gap-3 rounded-[24px] border border-white/10 bg-[#1f2232]/90 p-3.5 shadow-xl sm:p-4">
+        <div className="grid gap-3 sm:grid-cols-2">
           <Notice title={t("Poster", "发布者")} tone="info">
             {profileNickname()}
           </Notice>
@@ -196,7 +199,7 @@ export default function PostRequestPage() {
             {t("Contact details will be handled through the platform messaging system.", "联系方式将通过平台消息系统进行沟通。")}
           </Notice>
         </div>
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           <RouteSelect
             label={t("Departure", "出发地")}
             country={form.fromCountry}
@@ -213,10 +216,10 @@ export default function PostRequestPage() {
           />
         </div>
         <FormField id="itemName" label={t("Item", "物品")} required placeholder={t("Textbook", "教材")} value={form.itemName} onChange={(event) => setForm({ ...form, itemName: event.target.value })} />
-        <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="rounded-[18px] border border-white/10 bg-white/[0.04] p-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="whitespace-pre-line text-sm font-semibold leading-6 text-slate-100">
+              <p className="whitespace-pre-line text-xs font-semibold leading-5 text-slate-100">
                 {t("Item photo (optional)", "物品照片（可选）")}
               </p>
               <p className="mt-1 text-xs leading-5 text-slate-400">
@@ -226,7 +229,7 @@ export default function PostRequestPage() {
                 {t("Do not upload passports, visas, bank cards, or sensitive documents.", "请勿上传护照、签证、银行卡或其他敏感证件。")}
               </p>
             </div>
-            <label className="pressable inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#38bdf8] px-4 text-sm font-black text-white">
+            <label className="pressable inline-flex min-h-9 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#38bdf8] px-3 text-xs font-black text-white">
               <Camera size={17} />
               <span>{t("Add photo", "添加照片")}</span>
               <input
@@ -244,12 +247,12 @@ export default function PostRequestPage() {
             </label>
           </div>
           {form.itemPhotoDataUrl ? (
-            <div className="mt-4 overflow-hidden rounded-[22px] border border-white/10 bg-[#071223]/70">
-              <img src={form.itemPhotoDataUrl} alt="Selected item preview" className="h-48 w-full object-cover" />
+            <div className="mt-3 overflow-hidden rounded-[16px] border border-white/10 bg-[#071223]/70">
+              <img src={form.itemPhotoDataUrl} alt="Selected item preview" className="h-36 w-full object-cover" />
               <button
                 type="button"
                 onClick={() => setForm({ ...form, itemPhotoDataUrl: "" })}
-                className="flex w-full items-center justify-center gap-2 bg-white/[0.06] px-4 py-3 text-sm font-black text-slate-200"
+                className="flex w-full items-center justify-center gap-2 bg-white/[0.06] px-3 py-2 text-xs font-black text-slate-200"
               >
                 <X size={16} />
                 {t("Remove photo", "移除照片")}
@@ -258,27 +261,27 @@ export default function PostRequestPage() {
           ) : null}
         </div>
         <label htmlFor="itemCategory" className="block">
-          <span className="whitespace-pre-line text-sm font-semibold leading-6 text-slate-100">
+          <span className="whitespace-pre-line text-xs font-semibold leading-5 text-slate-100">
             {t("Item category", "物品分类")}
           </span>
           <select
             id="itemCategory"
             value={form.itemCategory}
             onChange={(event) => setForm({ ...form, itemCategory: event.target.value as ItemCategory })}
-            className="mt-2 w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none focus:border-[#38bdf8]"
+            className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]"
           >
             {itemCategories.map((category) => (
               <option key={category} value={category}>{itemCategoryLabel(category, language)}</option>
             ))}
           </select>
         </label>
-        <div className="grid gap-5 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-3">
           <FormField id="estimatedValueEur" label={t("Item estimated value EUR", "物品预估价值 EUR")} type="number" min="0" step="0.01" required value={form.estimatedValueEur} onChange={(event) => setForm({ ...form, estimatedValueEur: event.target.value })} />
           <FormField id="desiredDeliveryDate" label={t("Desired delivery date", "期望送达日期")} type="date" required value={form.desiredDeliveryDate} onChange={(event) => setForm({ ...form, desiredDeliveryDate: event.target.value })} />
           <FormField id="budgetEur" label={t("Order budget EUR", "本单预算 EUR")} type="number" min="0" step="0.01" required value={form.budgetEur} onChange={(event) => setForm({ ...form, budgetEur: event.target.value })} />
         </div>
         <label htmlFor="chinaDomesticShipping" className="block">
-          <span className="whitespace-pre-line text-sm font-semibold leading-6 text-slate-100">
+          <span className="whitespace-pre-line text-xs font-semibold leading-5 text-slate-100">
             {t("Domestic shipping in China available?", "中国国内是否可邮寄？")}
           </span>
           <select
@@ -290,7 +293,7 @@ export default function PostRequestPage() {
                 chinaDomesticShipping: event.target.value as ChinaDomesticShipping,
               })
             }
-            className="mt-2 w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none focus:border-[#38bdf8] focus:ring-4 focus:ring-sky-400/10"
+            className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8] focus:ring-4 focus:ring-sky-400/10"
           >
             {chinaDomesticShippingOptions.map((option) => (
               <option key={option} value={option}>
@@ -309,7 +312,7 @@ export default function PostRequestPage() {
         <Notice title={t("Domestic anonymous shipping in China", "中国国内匿名邮寄")} tone="info">
           {t("If domestic forwarding is needed, users can discuss SF Express anonymous shipping and tracking inside chat. MVP provides guidance only.", "如需中国国内转寄，可在聊天中协商顺丰匿名寄件与运单信息。MVP 阶段平台仅提供指引。")}
         </Notice>
-        <label className="flex gap-3 rounded-[24px] bg-sky-400/10 p-4 text-sm leading-6 text-slate-200">
+        <label className="flex gap-2 rounded-[18px] bg-sky-400/10 p-3 text-xs leading-5 text-slate-200">
           <input
             type="checkbox"
             required
@@ -321,7 +324,7 @@ export default function PostRequestPage() {
             {t("I confirm this is not a restricted, illegal, luxury, high-value, or identity document item.", "我确认该物品不是限制、违法、奢侈、高价值或身份证件类物品。")}
           </span>
         </label>
-        <label className="flex gap-3 rounded-[24px] bg-sky-400/10 p-4 text-sm leading-6 text-slate-200">
+        <label className="flex gap-2 rounded-[18px] bg-sky-400/10 p-3 text-xs leading-5 text-slate-200">
           <input
             type="checkbox"
             required
@@ -336,25 +339,25 @@ export default function PostRequestPage() {
         <button
           type="submit"
           disabled={state === "submitting" || !form.confirmation || !form.complianceConfirmation}
-          className="min-h-14 rounded-2xl bg-[#38bdf8] px-5 py-3 text-sm font-black text-white transition hover:bg-[#0ea5e9] disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-h-11 rounded-xl bg-[#38bdf8] px-4 py-2 text-xs font-black text-white transition hover:bg-[#0ea5e9] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {state === "submitting" ? t("Submitting...", "提交中...") : t("Review matching carriers", "查看匹配建议")}
         </button>
       </form>
 
       {showMatches ? (
-        <section className="mt-6 rounded-[32px] border border-white/10 bg-[#1f2232]/95 p-5 shadow-2xl">
-          <h2 className="text-xl font-black text-white">{t("Possible matching carry posts", "可能匹配的顺路送")}</h2>
+        <section className="mt-4 rounded-[24px] border border-white/10 bg-[#1f2232]/95 p-3.5 shadow-xl">
+          <h2 className="text-base font-black text-white">{t("Possible matching carry posts", "可能匹配的顺路送")}</h2>
           <div className="mt-4 grid gap-3">
             {matches.length ? matches.map(({ carrier, score }) => (
-              <Link key={carrier.id} to={`/market/carry/${carrier.id}`} className="block rounded-[24px] border border-white/10 bg-white/[0.06] p-4 transition hover:border-sky-300/30">
-                <p className="text-sm font-black text-white">{carrier.travelRoute}</p>
-                <p className="mt-2 text-sm text-slate-400">{carrier.travelDate} · {carrier.availableLuggageSpace}</p>
-                <p className="mt-2 text-sm font-black text-sky-200">{carrier.expectedReward}</p>
+              <Link key={carrier.id} to={`/market/carry/${carrier.id}`} className="block rounded-[18px] border border-white/10 bg-white/[0.06] p-3 transition hover:border-sky-300/30">
+                <p className="text-xs font-black text-white">{carrier.travelRoute}</p>
+                <p className="mt-1 text-xs text-slate-400">{carrier.travelDate} · {carrier.availableLuggageSpace}</p>
+                <p className="mt-1 text-xs font-black text-sky-200">{carrier.expectedReward}</p>
                 <p className="mt-2 text-xs text-slate-500">{t("Match score", "匹配分")}: {score}</p>
               </Link>
             )) : (
-              <p className="rounded-[24px] border border-white/10 bg-white/[0.06] p-4 text-sm text-slate-400">
+              <p className="rounded-[18px] border border-white/10 bg-white/[0.06] p-3 text-xs text-slate-400">
                 {t("No suitable carry match yet. You can still publish your request.", "暂无合适的顺路送匹配，你仍然可以发布需求。")}
               </p>
             )}
@@ -363,7 +366,7 @@ export default function PostRequestPage() {
             <button
               type="button"
               onClick={() => void publishRequest()}
-              className="pressable min-h-14 rounded-2xl bg-[#38bdf8] px-4 text-sm font-black text-white"
+              className="pressable min-h-11 rounded-xl bg-[#38bdf8] px-3 text-xs font-black text-white"
             >
               {t("Publish request", "直接发布需求")}
             </button>
@@ -393,12 +396,12 @@ function RouteSelect({
 
   return (
     <div>
-      <p className="text-sm font-semibold leading-6 text-slate-100">{label}</p>
-      <div className="mt-2 grid gap-2 grid-cols-2">
+      <p className="text-xs font-semibold leading-5 text-slate-100">{label}</p>
+      <div className="mt-1.5 grid grid-cols-2 gap-2">
         <select
           value={country}
           onChange={(event) => onCountryChange(event.target.value as CountryName)}
-          className="block w-full min-w-0 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none focus:border-[#38bdf8]"
+          className="block w-full min-w-0 rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]"
         >
           {countries.map((option) => (
             <option key={option} value={option}>{countryLabel(option, language)}</option>
@@ -407,7 +410,7 @@ function RouteSelect({
         <select
           value={selectedCity}
           onChange={(event) => onCityChange(event.target.value)}
-          className="block w-full min-w-0 rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white outline-none focus:border-[#38bdf8]"
+          className="block w-full min-w-0 rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]"
         >
           {cityOptions.map((option) => (
             <option key={option} value={option}>{cityLabel(option, language)}</option>

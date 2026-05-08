@@ -4,18 +4,20 @@ import { ImagePlus, Send, X } from "lucide-react";
 import BackButton from "../components/BackButton";
 import {
   appendConversationMessage,
+  cancelConversationMatch,
+  confirmConversationMatch,
   currentUserId,
   getConversation,
   hideConversationMessageForMe,
   markConversationRead,
   recallConversationMessage,
-  updateConversationStatus,
   type Conversation,
   type ConversationMessage,
 } from "../lib/conversations";
 import { readImageAsDataUrl } from "../lib/imageFiles";
 import { useLanguage } from "../lib/language";
 import { isMatchedStatus, localizedStatusLabel } from "../lib/orderAccess";
+import { currentOwnerId } from "../lib/profile";
 import { updateSubmission } from "../lib/submissions";
 
 export default function ChatDetailPage() {
@@ -58,10 +60,22 @@ export default function ChatDetailPage() {
   }
 
   const isMatched = isMatchedStatus(conversation.status);
+  const sideId = currentOwnerId();
+  const canViewConversation =
+    !isMatched ||
+    !conversation.postOwnerId ||
+    !conversation.starterUserId ||
+    conversation.postOwnerId === sideId ||
+    conversation.starterUserId === sideId;
+  const hasConfirmed = conversation.matchConfirmations?.includes(sideId);
   const actionLabel =
     conversation.postType === "request"
       ? t("Accept Request", "接单")
       : t("Confirm Match", "同意合作");
+
+  if (!canViewConversation) {
+    return <Navigate to="/messages" replace />;
+  }
 
   function openMessageActions(messageId?: string) {
     if (messageId) {
@@ -104,52 +118,55 @@ export default function ChatDetailPage() {
   }
 
   return (
-    <section className="mx-auto flex min-h-[calc(100vh-132px)] max-w-3xl flex-col px-4 py-6 sm:px-6 sm:py-8">
+    <section className="mx-auto flex min-h-[calc(100vh-132px)] max-w-3xl flex-col px-4 py-4 sm:px-6 sm:py-6">
       <BackButton fallback="/messages" />
-      <div className="sticky top-0 z-10 rounded-[28px] border border-sky-300/20 bg-[#1f2232]/95 p-3 shadow-2xl backdrop-blur">
-        <div className="flex items-start justify-between gap-4">
+      <div className="sticky top-0 z-10 rounded-[22px] border border-sky-300/20 bg-[#1f2232]/95 p-2.5 shadow-xl backdrop-blur">
+        <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-xs font-bold text-slate-400">{t("Transaction", "交易")}</p>
-            <p className="mt-1 text-sm font-semibold text-slate-300">{conversation.route}</p>
+            <p className="mt-0.5 text-xs font-semibold text-slate-300">{conversation.route}</p>
           </div>
-          <span className="rounded-full bg-sky-400/15 px-3 py-1 text-xs font-black text-sky-100">
+          <span className="rounded-full bg-sky-400/15 px-2 py-0.5 text-[0.68rem] font-black text-sky-100">
             {localizedStatusLabel(conversation.status, language)}
           </span>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-300 sm:grid-cols-4">
-          <span className="rounded-2xl bg-white/[0.06] px-3 py-1.5">{t("Item", "物品")}: {conversation.item}</span>
-          <span className="rounded-2xl bg-white/[0.06] px-3 py-1.5">{t("Reward", "报酬")}: {conversation.reward}</span>
-          <span className="rounded-2xl bg-white/[0.06] px-3 py-1.5">{t("Location", "地点")}: TBD</span>
-          <span className="rounded-2xl bg-white/[0.06] px-3 py-1.5">{t("Time", "时间")}: TBD</span>
+        <div className="mt-2 grid grid-cols-2 gap-1.5 text-[0.68rem] text-slate-300 sm:grid-cols-4">
+          <span className="rounded-xl bg-white/[0.06] px-2 py-1">{t("Item", "物品")}: {conversation.item}</span>
+          <span className="rounded-xl bg-white/[0.06] px-2 py-1">{t("Reward", "报酬")}: {conversation.reward}</span>
+          <span className="rounded-xl bg-white/[0.06] px-2 py-1">{t("Location", "地点")}: TBD</span>
+          <span className="rounded-xl bg-white/[0.06] px-2 py-1">{t("Time", "时间")}: TBD</span>
         </div>
         <button
           type="button"
-          disabled={isMatched}
+          disabled={isMatched || hasConfirmed}
           onClick={() => {
-            setConversation(updateConversationStatus(conversation.id, "Matched"));
-            void updateSubmission(conversation.postId, { status: "Matched" });
+            const result = confirmConversationMatch(conversation.id, sideId);
+            setConversation(result.conversation);
+            if (result.matched) {
+              void updateSubmission(conversation.postId, { status: "Matched" });
+            }
           }}
-          className="pressable mt-2 w-full rounded-xl bg-[#38bdf8] px-4 py-2 text-sm font-black text-white disabled:bg-white/10 disabled:text-slate-400"
+          className="pressable mt-2 w-full rounded-lg bg-[#38bdf8] px-3 py-1.5 text-xs font-black text-white disabled:bg-white/10 disabled:text-slate-400"
         >
-          {isMatched ? t("Matched", "已匹配") : actionLabel}
+          {isMatched ? t("Matched", "已匹配") : hasConfirmed ? t("Waiting for the other side", "等待对方确认") : actionLabel}
         </button>
-        {isMatched ? (
+        {isMatched || hasConfirmed ? (
           <button
             type="button"
             onClick={() => {
-              setConversation(updateConversationStatus(conversation.id, "Open"));
+              setConversation(cancelConversationMatch(conversation.id));
               void updateSubmission(conversation.postId, { status: "Open" });
             }}
-            className="pressable mt-2 w-full rounded-xl border border-red-300/25 bg-red-500/10 px-4 py-2 text-sm font-black text-red-100"
+            className="pressable mt-1.5 w-full rounded-lg border border-red-300/25 bg-red-500/10 px-3 py-1.5 text-xs font-black text-red-100"
           >
             {t("Cancel Match", "取消匹配")}
           </button>
         ) : null}
       </div>
 
-      <div className="flex-1 space-y-4 pb-44 pt-6">
+      <div className="flex-1 space-y-3 pb-36 pt-4">
         {conversation.messages
-          .filter((message) => !message.hiddenForUserIds?.includes(currentUserId))
+          .filter((message) => !message.hiddenForUserIds?.includes(sideId))
           .map((message) => {
           const isMe = message.senderId === currentUserId || message.author === "Me";
           if (message.recalled) {
@@ -166,19 +183,22 @@ export default function ChatDetailPage() {
               className={`flex items-end gap-2 ${isMe ? "justify-end" : "justify-start"}`}
             >
               {!isMe ? (
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sky-300/15 text-xs font-black text-sky-100 ring-1 ring-sky-300/25">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-300/15 text-[0.68rem] font-black text-sky-100 ring-1 ring-sky-300/25">
                   {conversation.otherUserName.charAt(0)}
                 </div>
               ) : null}
               <div
-                onPointerDown={() => startLongPress(message.id)}
+                onPointerDown={() => {
+                  startLongPress(message.id);
+                }}
                 onPointerUp={clearLongPress}
+                onPointerCancel={clearLongPress}
                 onPointerLeave={clearLongPress}
                 onContextMenu={(event) => {
                   event.preventDefault();
                   openMessageActions(message.id);
                 }}
-                className={`group relative max-w-[78%] rounded-[22px] px-4 py-3 text-sm leading-6 shadow-xl ${
+                className={`group relative max-w-[78%] rounded-[18px] px-3 py-2 text-xs leading-5 shadow-lg ${
                   isMe
                     ? "bg-[#38bdf8] text-white"
                     : "border border-white/10 bg-[#1f2232]/95 text-slate-100"
@@ -223,11 +243,11 @@ export default function ChatDetailPage() {
 
       <form
         onSubmit={handleSend}
-        className="fixed inset-x-4 bottom-4 z-30 mx-auto max-w-3xl rounded-[24px] border border-white/10 bg-[#1f2232]/95 p-2 shadow-2xl backdrop-blur sm:bottom-6"
+        className="fixed inset-x-4 bottom-4 z-30 mx-auto max-w-3xl rounded-[20px] border border-white/10 bg-[#1f2232]/95 p-2 shadow-xl backdrop-blur sm:bottom-6"
       >
         {pendingImage ? (
-          <div className="mb-2 flex items-start gap-3 rounded-[20px] border border-white/10 bg-white/[0.06] p-2">
-            <img src={pendingImage} alt="Selected preview" className="h-20 w-20 rounded-2xl object-cover" />
+          <div className="mb-2 flex items-start gap-2 rounded-[16px] border border-white/10 bg-white/[0.06] p-2">
+            <img src={pendingImage} alt="Selected preview" className="h-16 w-16 rounded-xl object-cover" />
             <div className="min-w-0 flex-1">
               <p className="text-xs font-black text-white">{t("Image preview", "图片预览")}</p>
               <p className="mt-1 text-xs leading-5 text-slate-400">
@@ -249,9 +269,9 @@ export default function ChatDetailPage() {
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             placeholder={t("Type a message...", "输入消息...")}
-            className="min-w-0 flex-1 rounded-[18px] border border-white/10 bg-white/[0.06] px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-sky-300/40"
+            className="min-w-0 flex-1 rounded-[14px] border border-white/10 bg-white/[0.06] px-3 py-2.5 text-base text-white outline-none placeholder:text-slate-500 focus:border-sky-300/40"
           />
-          <label className="pressable flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-[18px] border border-white/10 bg-white/[0.06] text-sky-100">
+          <label className="pressable flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-[14px] border border-white/10 bg-white/[0.06] text-sky-100">
             <ImagePlus size={18} />
             <input
               type="file"
@@ -268,7 +288,7 @@ export default function ChatDetailPage() {
           </label>
           <button
             type="submit"
-            className="pressable flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-[#38bdf8] text-white"
+            className="pressable flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-[#38bdf8] text-white"
             aria-label="Send message"
           >
             <Send size={18} />
