@@ -1,4 +1,4 @@
-import { getConversations, updateConversationStatus } from "./conversations";
+import { getCachedConversations, updateConversationStatus } from "./conversations";
 import { currentOwnerId, profileNickname } from "./profile";
 import type { Submission, SubmissionStatus } from "../types";
 
@@ -40,7 +40,7 @@ export function isCurrentUserPostOwner(submission: Submission) {
 
 export function hasConversationForPost(submission: Submission) {
   const ownerId = currentOwnerId();
-  return getConversations().some((conversation) => {
+  return getCachedConversations().some((conversation) => {
     if (conversation.postId !== submission.id) {
       return false;
     }
@@ -61,10 +61,10 @@ export function canOpenSubmission(submission: Submission) {
   return isCurrentUserPostOwner(submission) || hasConversationForPost(submission);
 }
 
-export function markConversationForPost(postId: string, status: string) {
-  getConversations()
+export async function markConversationForPost(postId: string, status: string) {
+  await Promise.all(
+    getCachedConversations()
     .filter((conversation) => conversation.postId === postId)
-    .forEach((conversation) => {
-      updateConversationStatus(conversation.id, status);
-    });
+    .map((conversation) => updateConversationStatus(conversation.id, status)),
+  );
 }

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { Globe2, MessageCircle, PackageCheck } from "lucide-react";
+import { Globe2, MessageCircle, Moon, PackageCheck, Sun } from "lucide-react";
 import { useLanguage } from "../lib/language";
+import { useTheme } from "../lib/theme";
 
 const navItems = [
   { to: "/", label: "Home" },
@@ -12,6 +13,7 @@ const navItems = [
 
 export default function Header() {
   const { language, setLanguage, t } = useLanguage();
+  const { theme, toggleTheme } = useTheme();
   const [languageOpen, setLanguageOpen] = useState(false);
   const [languageClosing, setLanguageClosing] = useState(false);
 
@@ -29,7 +31,7 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-20 border-b border-white/10 bg-[#050918]/85 backdrop-blur">
+    <header className="app-header sticky top-0 z-20 border-b border-white/10 bg-[#050918]/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <Link to="/" className="flex items-center gap-2 font-semibold text-white">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#38bdf8] text-white shadow-sm">
@@ -73,6 +75,15 @@ export default function Header() {
             </div>
           ) : null}
         </div>
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="pressable theme-toggle flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300"
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          title={theme === "dark" ? "Light mode" : "Dark mode"}
+        >
+          {theme === "dark" ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
+        </button>
         <Link
           to="/messages"
           className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300 sm:hidden"

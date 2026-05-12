@@ -1,16 +1,5 @@
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  orderBy,
-  query,
-  serverTimestamp,
-  Timestamp,
-  updateDoc,
-} from "firebase/firestore";
-import { db } from "./firebase";
+import { cloudbaseDb, ensureCloudbaseLogin } from "../utils/cloudbase";
+import { currentOwnerId, profileNickname } from "./profile";
 import type {
   CarrierSubmission,
   RegistrationSubmission,
@@ -22,120 +11,120 @@ type RequestInput = Omit<RequestSubmission, "id" | "type" | "status" | "publishe
 type CarrierInput = Omit<CarrierSubmission, "id" | "type" | "status" | "publishedDate" | "createdAt">;
 type RegistrationInput = Omit<RegistrationSubmission, "id" | "createdAt">;
 
-const collectionName = "submissions";
-const registrationsCollectionName = "registrations";
-const localSubmissionsKey = "studentCarrySubmissions";
-const localRegistrationsKey = "studentCarryRegistrations";
-
-function requireDb() {
-  if (!db) {
-    throw new Error("Firebase is not configured. Add Vite Firebase variables to .env.local.");
-  }
-
-  return db;
-}
-
-function normalizeSubmission(id: string, data: Record<string, unknown>): Submission {
-  return {
-    ...data,
-    id,
-    createdAt:
-      data.createdAt instanceof Timestamp ? data.createdAt.toDate() : undefined,
-  } as Submission;
-}
+const postsCollectionName = "posts";
+const usersCollectionName = "users";
 
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function readLocal<T>(key: string): T[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    return JSON.parse(window.localStorage.getItem(key) || "[]") as T[];
-  } catch {
-    return [];
-  }
+function timestamp() {
+  return Date.now();
 }
 
-function writeLocal<T extends { id: string }>(key: string, item: T) {
-  const current = readLocal<T>(key);
-  window.localStorage.setItem(key, JSON.stringify([item, ...current]));
+function stripUndefined<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map(stripUndefined) as T;
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, entry]) => entry !== undefined)
+        .map(([key, entry]) => [key, stripUndefined(entry)]),
+    ) as T;
+  }
+
+  return value;
+}
+
+function dateFrom(value: unknown) {
+  if (!value) {
+    return undefined;
+  }
+
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (typeof value === "number" || typeof value === "string") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? undefined : date;
+  }
+
+  return undefined;
+}
+
+function normalizeSubmission(data: Record<string, unknown>): Submission {
+  return {
+    ...data,
+    id: String(data._id || data.id || ""),
+    status: data.status === "Matched" ? "Matched" : "Open",
+    createdAt: dateFrom(data.createdAt),
+  } as Submission;
+}
+
+function isOwner(submission: Submission) {
+  const ownerId = currentOwnerId();
+  const nickname = profileNickname();
+  return Boolean(
+    (submission.ownerId && submission.ownerId === ownerId) ||
+      (!submission.ownerId && nickname && (submission.ownerNickname || submission.name) === nickname),
+  );
+}
+
+async function getPost(id: string) {
+  await ensureCloudbaseLogin();
+  const result = await cloudbaseDb.collection(postsCollectionName).doc(id).get();
+  const post = result.data?.[0];
+  return post ? normalizeSubmission(post) : null;
+}
+
+function isStatusOnlyUpdate(data: Partial<Submission>) {
+  const keys = Object.keys(data);
+  return keys.length > 0 && keys.every((key) => key === "status");
 }
 
 export async function createRequestSubmission(data: RequestInput) {
-  if (!db) {
-    writeLocal<Submission>(localSubmissionsKey, {
+  await ensureCloudbaseLogin();
+  await cloudbaseDb.collection(postsCollectionName).add(
+    stripUndefined({
       ...data,
-      id: `${Date.now()}`,
       type: "request",
       status: "Open",
       publishedDate: today(),
-      createdAt: new Date(),
-    });
-    return;
-  }
-
-  await addDoc(collection(requireDb(), collectionName), {
-    ...data,
-    type: "request",
-    status: "Open",
-    publishedDate: new Date().toISOString().slice(0, 10),
-    createdAt: serverTimestamp(),
-  });
+      createdAt: timestamp(),
+      updatedAt: timestamp(),
+    }),
+  );
 }
 
 export async function createCarrierSubmission(data: CarrierInput) {
-  if (!db) {
-    writeLocal<Submission>(localSubmissionsKey, {
+  await ensureCloudbaseLogin();
+  await cloudbaseDb.collection(postsCollectionName).add(
+    stripUndefined({
       ...data,
-      id: `${Date.now()}`,
       type: "carrier",
       status: "Open",
       publishedDate: today(),
-      createdAt: new Date(),
-    });
-    return;
-  }
-
-  await addDoc(collection(requireDb(), collectionName), {
-    ...data,
-    type: "carrier",
-    status: "Open",
-    publishedDate: new Date().toISOString().slice(0, 10),
-    createdAt: serverTimestamp(),
-  });
+      createdAt: timestamp(),
+      updatedAt: timestamp(),
+    }),
+  );
 }
 
 export async function getSubmissions() {
-  if (!db) {
-    return readLocal<Submission>(localSubmissionsKey).map((submission) => ({
-      ...submission,
-      createdAt: submission.createdAt ? new Date(submission.createdAt) : undefined,
-    }));
-  }
+  await ensureCloudbaseLogin();
+  const result = await cloudbaseDb
+    .collection(postsCollectionName)
+    .orderBy("createdAt", "desc")
+    .get();
 
-  const snapshot = await getDocs(
-    query(collection(requireDb(), collectionName), orderBy("createdAt", "desc")),
-  );
-
-  return snapshot.docs.map((submission) =>
-    normalizeSubmission(submission.id, submission.data()),
-  );
+  return (result.data || []).map(normalizeSubmission);
 }
 
 export async function updateSubmissionPublishedDate(id: string, publishedDate: string) {
-  if (!db) {
-    const next = readLocal<Submission>(localSubmissionsKey).map((submission) =>
-      submission.id === id ? { ...submission, publishedDate } : submission,
-    );
-    window.localStorage.setItem(localSubmissionsKey, JSON.stringify(next));
-    return;
-  }
-
-  await updateDoc(doc(requireDb(), collectionName, id), { publishedDate });
+  return updateSubmission(id, { publishedDate } as Partial<Submission>);
 }
 
 export async function updateSubmissionDate(
@@ -143,53 +132,43 @@ export async function updateSubmissionDate(
   field: "desiredDeliveryDate" | "travelDate",
   value: string,
 ) {
-  if (!db) {
-    const next = readLocal<Submission>(localSubmissionsKey).map((submission) =>
-      submission.id === id ? { ...submission, [field]: value } : submission,
-    );
-    window.localStorage.setItem(localSubmissionsKey, JSON.stringify(next));
-    return;
-  }
-
-  await updateDoc(doc(requireDb(), collectionName, id), { [field]: value });
+  return updateSubmission(id, { [field]: value } as Partial<Submission>);
 }
 
 export async function updateSubmission(id: string, data: Partial<Submission>) {
-  if (!db) {
-    const next = readLocal<Submission>(localSubmissionsKey).map((submission) =>
-      submission.id === id ? ({ ...submission, ...data } as Submission) : submission,
-    );
-    window.localStorage.setItem(localSubmissionsKey, JSON.stringify(next));
-    return;
+  await ensureCloudbaseLogin();
+
+  if (!isStatusOnlyUpdate(data)) {
+    const post = await getPost(id);
+    if (!post || !isOwner(post)) {
+      throw new Error("Only the post owner can edit this post.");
+    }
   }
 
-  await updateDoc(doc(requireDb(), collectionName, id), data);
+  await cloudbaseDb
+    .collection(postsCollectionName)
+    .doc(id)
+    .update(stripUndefined({ ...data, updatedAt: timestamp() }));
 }
 
 export async function deleteSubmission(id: string) {
-  if (!db) {
-    const next = readLocal<Submission>(localSubmissionsKey).filter(
-      (submission) => submission.id !== id,
-    );
-    window.localStorage.setItem(localSubmissionsKey, JSON.stringify(next));
-    return;
+  await ensureCloudbaseLogin();
+  const post = await getPost(id);
+  if (!post || !isOwner(post)) {
+    throw new Error("Only the post owner can delete this post.");
   }
 
-  await deleteDoc(doc(requireDb(), collectionName, id));
+  await cloudbaseDb.collection(postsCollectionName).doc(id).remove();
 }
 
 export async function createRegistrationSubmission(data: RegistrationInput) {
-  if (!db) {
-    writeLocal<RegistrationSubmission>(localRegistrationsKey, {
+  await ensureCloudbaseLogin();
+  await cloudbaseDb.collection(usersCollectionName).add(
+    stripUndefined({
       ...data,
-      id: `${Date.now()}`,
-      createdAt: new Date(),
-    });
-    return;
-  }
-
-  await addDoc(collection(requireDb(), registrationsCollectionName), {
-    ...data,
-    createdAt: serverTimestamp(),
-  });
+      ownerId: currentOwnerId(),
+      createdAt: timestamp(),
+      updatedAt: timestamp(),
+    }),
+  );
 }

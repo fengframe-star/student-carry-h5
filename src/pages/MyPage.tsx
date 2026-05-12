@@ -36,9 +36,12 @@ export default function MyPage() {
   const [verificationChoice, setVerificationChoice] = useState("No");
   const [loginError, setLoginError] = useState("");
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [conversations, setConversations] = useState<Awaited<ReturnType<typeof getConversations>>>([]);
 
   async function loadPosts() {
-    setSubmissions(await getSubmissions());
+    const [nextSubmissions, nextConversations] = await Promise.all([getSubmissions(), getConversations()]);
+    setSubmissions(nextSubmissions);
+    setConversations(nextConversations);
   }
 
   useEffect(() => {
@@ -135,7 +138,7 @@ export default function MyPage() {
 
   const ownerId = currentOwnerId();
   const matchedPostIds = new Set(
-    getConversations()
+    conversations
       .filter((conversation) => conversation.postOwnerId === ownerId || conversation.starterUserId === ownerId)
       .map((conversation) => conversation.postId),
   );

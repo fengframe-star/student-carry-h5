@@ -4,6 +4,23 @@
 
 :root {
   color-scheme: dark;
+  --app-bg: #050918;
+  --app-main-bg:
+    radial-gradient(circle at 22% 6%, rgb(56 189 248 / 0.28), transparent 34%),
+    radial-gradient(circle at 85% 18%, rgb(32 199 255 / 0.14), transparent 30%),
+    #050918;
+  --app-header-bg: rgb(5 9 24 / 0.85);
+  --app-footer-bg: #050918;
+  --app-surface: rgb(31 34 50 / 0.9);
+  --app-surface-strong: rgb(20 24 39 / 0.95);
+  --app-surface-soft: rgb(255 255 255 / 0.06);
+  --app-border: rgb(255 255 255 / 0.1);
+  --app-border-strong: rgb(255 255 255 / 0.15);
+  --app-text: #ffffff;
+  --app-text-soft: #cbd5e1;
+  --app-text-muted: #94a3b8;
+  --app-shadow: 0 20px 56px rgb(0 0 0 / 0.22);
+  --app-shadow-compact: 0 14px 34px rgb(0 0 0 / 0.18);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
@@ -11,7 +28,7 @@
 
 body {
   margin: 0;
-  background: #050918;
+  background: var(--app-bg);
 }
 
 input,
@@ -31,6 +48,50 @@ select {
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+.theme-dark {
+  color-scheme: dark;
+}
+
+.theme-light {
+  color-scheme: light;
+  --app-bg: #f5f7fb;
+  --app-main-bg:
+    radial-gradient(circle at 22% 4%, rgb(56 189 248 / 0.22), transparent 30%),
+    radial-gradient(circle at 84% 12%, rgb(14 165 233 / 0.12), transparent 28%),
+    linear-gradient(180deg, #f8fafc 0%, #eef4fb 100%);
+  --app-header-bg: rgb(255 255 255 / 0.82);
+  --app-footer-bg: #f8fafc;
+  --app-surface: rgb(255 255 255 / 0.82);
+  --app-surface-strong: rgb(255 255 255 / 0.94);
+  --app-surface-soft: rgb(15 23 42 / 0.045);
+  --app-border: rgb(15 23 42 / 0.1);
+  --app-border-strong: rgb(15 23 42 / 0.14);
+  --app-text: #0f172a;
+  --app-text-soft: #334155;
+  --app-text-muted: #64748b;
+  --app-shadow: 0 18px 45px rgb(15 23 42 / 0.09);
+  --app-shadow-compact: 0 12px 30px rgb(15 23 42 / 0.08);
+}
+
+.app-shell {
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+
+.app-main {
+  background: var(--app-main-bg);
+}
+
+.app-header {
+  background: var(--app-header-bg);
+  border-color: var(--app-border);
+}
+
+.theme-light footer {
+  background: var(--app-footer-bg);
+  border-color: var(--app-border);
 }
 
 .pressable {
@@ -190,6 +251,115 @@ a {
   animation: active-dot-pulse 1.8s ease-out infinite;
 }
 
+.theme-light .language-picker::before {
+  background: linear-gradient(90deg, rgb(248 250 252 / 0), rgb(255 255 255 / 0.92) 28%, rgb(255 255 255 / 0.92));
+}
+
+.theme-light .language-globe,
+.theme-light .theme-toggle,
+.theme-light header a[aria-label="Message"] {
+  background: rgb(255 255 255 / 0.72);
+  border-color: var(--app-border);
+  color: #334155;
+  box-shadow: 0 8px 22px rgb(15 23 42 / 0.08);
+}
+
+.theme-light .language-globe-open {
+  background: rgb(56 189 248 / 0.14);
+  border-color: rgb(14 165 233 / 0.24);
+  box-shadow:
+    0 8px 22px rgb(15 23 42 / 0.08),
+    0 0 16px rgb(56 189 248 / 0.16);
+}
+
+.theme-light .language-options {
+  background: rgb(255 255 255 / 0.96);
+  border-color: var(--app-border);
+  box-shadow: 0 18px 42px rgb(15 23 42 / 0.1);
+}
+
+.theme-light [class*="bg-[#050918]"],
+.theme-light [class*="bg-[#1f2232]"],
+.theme-light [class*="bg-[#141827]"],
+.theme-light [class*="bg-[#171b2b]"],
+.theme-light [class*="bg-[#24283a]"] {
+  background-color: var(--app-surface) !important;
+}
+
+.theme-light [class*="bg-white/"],
+.theme-light [class*="bg-white\\["] {
+  background-color: var(--app-surface-soft) !important;
+}
+
+.theme-light [class*="border-white/"] {
+  border-color: var(--app-border) !important;
+}
+
+.theme-light .text-white,
+.theme-light [class*="text-slate-100"],
+.theme-light [class*="text-slate-200"] {
+  color: var(--app-text) !important;
+}
+
+.theme-light [class*="text-slate-300"],
+.theme-light [class*="text-slate-400"] {
+  color: var(--app-text-soft) !important;
+}
+
+.theme-light [class*="text-slate-500"],
+.theme-light [class*="text-slate-600"] {
+  color: var(--app-text-muted) !important;
+}
+
+.theme-light [class*="bg-[#38bdf8]"],
+.theme-light [class*="bg-sky-400"],
+.theme-light [class*="bg-red-500"] {
+  color: #fff !important;
+}
+
+.theme-light [class*="shadow-xl"],
+.theme-light [class*="shadow-2xl"] {
+  box-shadow: var(--app-shadow) !important;
+}
+
+.theme-light input,
+.theme-light textarea,
+.theme-light select {
+  background-color: rgb(255 255 255 / 0.82) !important;
+  border-color: var(--app-border-strong) !important;
+  color: var(--app-text) !important;
+}
+
+.theme-light input::placeholder,
+.theme-light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+.theme-light .market-card,
+.theme-light .my-card {
+  border-color: var(--app-border);
+  background: var(--app-surface-strong);
+  box-shadow: var(--app-shadow-compact);
+}
+
+.theme-light .market-route,
+.theme-light .market-line,
+.theme-light .pill {
+  color: var(--app-text-soft);
+}
+
+.theme-light .market-main {
+  color: var(--app-text);
+}
+
+.theme-light .pill {
+  background: rgb(15 23 42 / 0.055);
+}
+
+.theme-light img {
+  border-color: var(--app-border);
+}
+
 @keyframes fade-slide-in {
   from {
     opacity: 0;
@@ -279,22 +449,22 @@ a {
 .my-card {
   min-width: 0;
   border-radius: 28px;
-  border: 1px solid rgb(255 255 255 / 0.08);
-  background: rgb(31 34 50 / 0.92);
-  box-shadow: 0 20px 56px rgb(0 0 0 / 0.22);
+  border: 1px solid var(--app-border);
+  background: var(--app-surface);
+  box-shadow: var(--app-shadow);
   animation: fade-slide-in 240ms ease both;
 }
 
 .market-card {
   padding: 12px;
   border-radius: 22px;
-  box-shadow: 0 14px 34px rgb(0 0 0 / 0.18);
+  box-shadow: var(--app-shadow-compact);
 }
 
 .my-card {
   border-radius: 22px;
   padding: 10px 12px;
-  box-shadow: 0 14px 34px rgb(0 0 0 / 0.18);
+  box-shadow: var(--app-shadow-compact);
 }
 
 .market-route {

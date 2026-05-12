@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MessageCircle } from "lucide-react";
 import BackButton from "../components/BackButton";
-import { createOrOpenConversation } from "../lib/conversations";
+import { createOrOpenConversation, getConversations } from "../lib/conversations";
 import { itemCategoryLabel } from "../lib/matching";
 import { formatPostedTime } from "../utils/time";
 import { routeLabel } from "../lib/cities";
@@ -27,7 +27,7 @@ export default function CarryDetailPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const submissions = await getSubmissions();
+      const [submissions] = await Promise.all([getSubmissions(), getConversations()]);
       const matched = submissions.find(
         (submission): submission is CarrierSubmission =>
           submission.type === "carrier" && submission.id === id,
@@ -62,7 +62,7 @@ export default function CarryDetailPage() {
     }
 
     await updateSubmission(carry.id, { status: "Open" });
-    markConversationForPost(carry.id, "Open");
+    await markConversationForPost(carry.id, "Open");
     setCarry({ ...carry, status: "Open" });
   }
 
@@ -166,12 +166,12 @@ export default function CarryDetailPage() {
         hidden={Boolean(carry && isOwner)}
         disabled={!carry || !canOpen}
         label={isMatched ? t("Open Chat", "打开聊天") : t("Start Chat", "开始沟通")}
-        onContact={() => {
+        onContact={async () => {
           if (!carry) {
             return;
           }
 
-          const conversation = createOrOpenConversation({
+          const conversation = await createOrOpenConversation({
             postType: "carry",
             postId: carry.id,
             postOwnerId: carry.ownerId || carry.ownerNickname || carry.name,

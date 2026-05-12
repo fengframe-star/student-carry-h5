@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MessageCircle } from "lucide-react";
 import BackButton from "../components/BackButton";
-import { createOrOpenConversation } from "../lib/conversations";
+import { createOrOpenConversation, getConversations } from "../lib/conversations";
 import { itemCategoryLabel } from "../lib/matching";
 import { formatPostedTime } from "../utils/time";
 import { cityLabel } from "../lib/cities";
@@ -27,7 +27,7 @@ export default function RequestDetailPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const submissions = await getSubmissions();
+      const [submissions] = await Promise.all([getSubmissions(), getConversations()]);
       const matched = submissions.find(
         (submission): submission is RequestSubmission =>
           submission.type === "request" && submission.id === id,
@@ -57,7 +57,7 @@ export default function RequestDetailPage() {
     }
 
     await updateSubmission(request.id, { status: "Open" });
-    markConversationForPost(request.id, "Open");
+    await markConversationForPost(request.id, "Open");
     setRequest({ ...request, status: "Open" });
   }
 
@@ -178,12 +178,12 @@ export default function RequestDetailPage() {
         hidden={Boolean(request && isOwner)}
         disabled={!request || !canOpen}
         label={isMatched ? t("Open Chat", "打开聊天") : t("Start Chat", "开始沟通")}
-        onContact={() => {
+        onContact={async () => {
           if (!request) {
             return;
           }
 
-          const conversation = createOrOpenConversation({
+          const conversation = await createOrOpenConversation({
             postType: "request",
             postId: request.id,
             postOwnerId: request.ownerId || request.ownerNickname || request.name,

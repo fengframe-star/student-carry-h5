@@ -3,18 +3,29 @@ import Header from "./components/Header";
 import Footer from "./components/Footer";
 import BottomNav from "./components/BottomNav";
 import { LanguageProvider } from "./lib/language";
+import { ThemeProvider, useTheme } from "./lib/theme";
 
 export default function App() {
   return (
     <LanguageProvider>
-      <div className="min-h-screen bg-[#050918] text-white">
-        <Header />
-        <main className="min-h-[calc(100vh-132px)] bg-[radial-gradient(circle_at_22%_6%,rgba(56,189,248,0.28),transparent_34%),radial-gradient(circle_at_85%_18%,rgba(32,199,255,0.14),transparent_30%),#050918] pb-24 sm:pb-8">
-          <Outlet />
-        </main>
-        <BottomNav />
-        <Footer />
-      </div>
+      <ThemeProvider>
+        <AppShell />
+      </ThemeProvider>
     </LanguageProvider>
+  );
+}
+
+function AppShell() {
+  const { theme } = useTheme();
+
+  return (
+    <div className={`theme-${theme} app-shell min-h-screen text-white`}>
+      <Header />
+      <main className="app-main min-h-[calc(100vh-132px)] pb-24 sm:pb-8">
+        <Outlet />
+      </main>
+      <BottomNav />
+      <Footer />
+    </div>
   );
 }

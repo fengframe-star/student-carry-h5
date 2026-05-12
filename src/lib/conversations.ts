@@ -1,3 +1,4 @@
+import { cloudbaseDb, ensureCloudbaseLogin } from "../utils/cloudbase";
 import { currentOwnerId } from "./profile";
 
 export type ConversationMessage = {
@@ -35,110 +36,88 @@ export type ConversationInput = Omit<
   "id" | "latestPreview" | "latestTime" | "unread" | "messages"
 >;
 
-const conversationsKey = "studentCarryConversations";
+const conversationsCollectionName = "conversations";
+const messagesCollectionName = "messages";
 export const currentUserId = "me";
+
+let conversationCache: Conversation[] = [];
+
+function timestamp() {
+  return Date.now();
+}
 
 function messageId() {
   return `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function normalizeMessage(message: ConversationMessage, index: number): ConversationMessage {
+function stripUndefined<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map(stripUndefined) as T;
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([, entry]) => entry !== undefined)
+        .map(([key, entry]) => [key, stripUndefined(entry)]),
+    ) as T;
+  }
+
+  return value;
+}
+
+function timeLabel(createdAt?: number) {
+  if (!createdAt) {
+    return "";
+  }
+
+  const minutes = Math.max(0, Math.round((Date.now() - createdAt) / 60_000));
+  if (minutes < 1) return "Now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
+}
+
+function normalizeMessage(message: Record<string, unknown>, index: number): ConversationMessage {
   return {
-    ...message,
-    id: message.id || `legacy-${index}`,
-    senderId: message.senderId || (message.author === "Me" ? currentUserId : "other-user"),
-    createdAt: message.createdAt || 0,
+    id: String(message._id || message.id || `legacy-${index}`),
+    author: message.author === "Post owner" ? "Post owner" : "Me",
+    senderId: String(message.senderId || (message.author === "Me" ? currentUserId : "other-user")),
+    text: typeof message.text === "string" ? message.text : undefined,
+    imageDataUrl: typeof message.imageDataUrl === "string" ? message.imageDataUrl : undefined,
+    createdAt: typeof message.createdAt === "number" ? message.createdAt : 0,
     recalled: Boolean(message.recalled),
-    hiddenForUserIds: message.hiddenForUserIds || [],
+    hiddenForUserIds: Array.isArray(message.hiddenForUserIds)
+      ? (message.hiddenForUserIds as string[])
+      : [],
   };
 }
 
-function normalizeConversation(conversation: Conversation): Conversation {
+function normalizeConversation(data: Record<string, unknown>, messages: ConversationMessage[] = []): Conversation {
+  const createdAt = typeof data.createdAt === "number" ? data.createdAt : undefined;
   return {
-    ...conversation,
-    status: conversation.status === "Matched" ? "Matched" : "Open",
-    starterUserId: conversation.starterUserId || currentUserId,
-    matchConfirmations: conversation.matchConfirmations || [],
-    hiddenForUserIds: conversation.hiddenForUserIds || [],
-    messages: conversation.messages.map(normalizeMessage),
+    id: String(data._id || data.id || ""),
+    postType: data.postType === "carry" ? "carry" : "request",
+    postId: String(data.postId || ""),
+    otherUserName: String(data.otherUserName || ""),
+    item: String(data.item || ""),
+    route: String(data.route || ""),
+    reward: String(data.reward || ""),
+    status: data.status === "Matched" ? "Matched" : "Open",
+    postOwnerId: typeof data.postOwnerId === "string" ? data.postOwnerId : undefined,
+    starterUserId: typeof data.starterUserId === "string" ? data.starterUserId : currentOwnerId(),
+    matchConfirmations: Array.isArray(data.matchConfirmations)
+      ? (data.matchConfirmations as string[])
+      : [],
+    latestPreview: String(data.latestPreview || ""),
+    latestTime: String(data.latestTime || timeLabel(createdAt)),
+    unread: Boolean(data.unread),
+    hiddenForUserIds: Array.isArray(data.hiddenForUserIds)
+      ? (data.hiddenForUserIds as string[])
+      : [],
+    messages,
   };
-}
-
-function canUseStorage() {
-  return typeof window !== "undefined";
-}
-
-export function getConversations() {
-  if (!canUseStorage()) {
-    return [];
-  }
-
-  try {
-    return (JSON.parse(window.localStorage.getItem(conversationsKey) || "[]") as Conversation[]).map(
-      normalizeConversation,
-    );
-  } catch {
-    return [];
-  }
-}
-
-export function getConversation(id: string) {
-  return getConversations().find((conversation) => conversation.id === id) ?? null;
-}
-
-function writeConversations(conversations: Conversation[]) {
-  if (!canUseStorage()) {
-    return;
-  }
-
-  window.localStorage.setItem(conversationsKey, JSON.stringify(conversations));
-}
-
-export function createOrOpenConversation(input: ConversationInput) {
-  const id = `${input.postType}-${input.postId}`;
-  const conversations = getConversations();
-  const existing = conversations.find((conversation) => conversation.id === id);
-
-  if (existing) {
-    return existing;
-  }
-
-  const conversation: Conversation = {
-    ...input,
-    id,
-    starterUserId: currentOwnerId(),
-    matchConfirmations: [],
-    latestPreview: "Hi, I would like to discuss this post.",
-    latestTime: "Just now",
-    unread: true,
-    messages: [
-      {
-        id: messageId(),
-        author: "Me",
-        senderId: currentUserId,
-        text: "Hi, I would like to discuss this post.",
-        createdAt: Date.now() - 180_000,
-      },
-      {
-        id: messageId(),
-        author: "Post owner",
-        senderId: "other-user",
-        text: "Sure, we can confirm the details here.",
-        createdAt: Date.now() - 170_000,
-      },
-    ],
-  };
-
-  writeConversations([conversation, ...conversations]);
-  return conversation;
-}
-
-export function markConversationRead(id: string) {
-  writeConversations(
-    getConversations().map((conversation) =>
-      conversation.id === id ? { ...conversation, unread: false } : conversation,
-    ),
-  );
 }
 
 function latestPreviewFor(messages: ConversationMessage[], viewerId = currentOwnerId()) {
@@ -157,172 +136,243 @@ function latestPreviewFor(messages: ConversationMessage[], viewerId = currentOwn
   return latest.text || (latest.imageDataUrl ? "Sent an image" : "");
 }
 
-export function appendConversationMessage(id: string, text?: string, imageDataUrl?: string) {
-  const conversations = getConversations();
-  const next = conversations.map((conversation) =>
-    conversation.id === id
-      ? {
-          ...conversation,
-          latestPreview: text || (imageDataUrl ? "Sent an image" : conversation.latestPreview),
-          latestTime: "Now",
-          unread: false,
-          messages: [
-            ...conversation.messages,
-            {
-              id: messageId(),
-              author: "Me" as const,
-              senderId: currentUserId,
-              text,
-              imageDataUrl,
-              createdAt: Date.now(),
-              recalled: false,
-              hiddenForUserIds: [],
-            },
-          ],
-        }
-      : conversation,
-  );
+async function readMessages(conversationId: string) {
+  const result = await cloudbaseDb
+    .collection(messagesCollectionName)
+    .where({ conversationId })
+    .orderBy("createdAt", "asc")
+    .get();
 
-  writeConversations(next);
-  return next.find((conversation) => conversation.id === id) ?? null;
+  return (result.data || []).map(normalizeMessage);
+}
+
+async function readConversationDocument(id: string) {
+  const result = await cloudbaseDb.collection(conversationsCollectionName).doc(id).get();
+  return result.data?.[0] as Record<string, unknown> | undefined;
+}
+
+export function getCachedConversations() {
+  return conversationCache;
+}
+
+export async function getConversations() {
+  await ensureCloudbaseLogin();
+  const result = await cloudbaseDb
+    .collection(conversationsCollectionName)
+    .orderBy("updatedAt", "desc")
+    .get();
+
+  const conversations = await Promise.all(
+    (result.data || []).map(async (data: Record<string, unknown>) =>
+      normalizeConversation(data, await readMessages(String(data._id || data.id || ""))),
+    ),
+  );
+  conversationCache = conversations;
+  return conversations;
+}
+
+export async function getConversation(id: string) {
+  await ensureCloudbaseLogin();
+  const data = await readConversationDocument(id);
+  if (!data) {
+    return null;
+  }
+
+  const conversation = normalizeConversation(data, await readMessages(id));
+  conversationCache = [
+    conversation,
+    ...conversationCache.filter((cached) => cached.id !== conversation.id),
+  ];
+  return conversation;
+}
+
+export async function createOrOpenConversation(input: ConversationInput) {
+  await ensureCloudbaseLogin();
+  const id = `${input.postType}-${input.postId}`;
+  const existing = await getConversation(id);
+
+  if (existing) {
+    return existing;
+  }
+
+  const conversation: Conversation = {
+    ...input,
+    id,
+    status: input.status === "Matched" ? "Matched" : "Open",
+    starterUserId: currentOwnerId(),
+    matchConfirmations: [],
+    latestPreview: "",
+    latestTime: "",
+    unread: true,
+    hiddenForUserIds: [],
+    messages: [],
+  };
+
+  await cloudbaseDb.collection(conversationsCollectionName).doc(id).set(
+    stripUndefined({
+      ...conversation,
+      messages: undefined,
+      createdAt: timestamp(),
+      updatedAt: timestamp(),
+    }),
+  );
+  conversationCache = [conversation, ...conversationCache];
+  return conversation;
+}
+
+export async function markConversationRead(id: string) {
+  await ensureCloudbaseLogin();
+  await cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
+    unread: false,
+    updatedAt: timestamp(),
+  });
+  conversationCache = conversationCache.map((conversation) =>
+    conversation.id === id ? { ...conversation, unread: false } : conversation,
+  );
+}
+
+export async function appendConversationMessage(id: string, text?: string, imageDataUrl?: string) {
+  await ensureCloudbaseLogin();
+  const createdAt = timestamp();
+  const message: ConversationMessage = {
+    id: messageId(),
+    author: "Me",
+    senderId: currentOwnerId(),
+    text,
+    imageDataUrl,
+    createdAt,
+    recalled: false,
+    hiddenForUserIds: [],
+  };
+  await cloudbaseDb.collection(messagesCollectionName).doc(message.id || messageId()).set(
+    stripUndefined({
+      ...message,
+      conversationId: id,
+    }),
+  );
+  const latestPreview = text || (imageDataUrl ? "Sent an image" : "");
+  await cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
+    latestPreview,
+    latestTime: timeLabel(createdAt),
+    unread: false,
+    updatedAt: createdAt,
+  });
+  return getConversation(id);
 }
 
 export function appendConversationImageMessage(id: string, imageDataUrl: string) {
   return appendConversationMessage(id, undefined, imageDataUrl);
 }
 
-export function hideConversationMessageForMe(id: string, messageIdToHide: string) {
-  const conversations = getConversations();
+export async function hideConversationMessageForMe(id: string, messageIdToHide: string) {
+  await ensureCloudbaseLogin();
+  const conversation = await getConversation(id);
+  if (!conversation) {
+    return null;
+  }
+
   const viewerId = currentOwnerId();
-  const next = conversations.map((conversation) => {
-    if (conversation.id !== id) {
-      return conversation;
-    }
+  const messages = conversation.messages.map((message) =>
+    message.id === messageIdToHide
+      ? {
+          ...message,
+          hiddenForUserIds: Array.from(new Set([...(message.hiddenForUserIds || []), viewerId])),
+        }
+      : message,
+  );
+  const message = messages.find((item) => item.id === messageIdToHide);
+  if (message?.id) {
+    await cloudbaseDb
+      .collection(messagesCollectionName)
+      .doc(message.id)
+      .update({ hiddenForUserIds: message.hiddenForUserIds || [] });
+  }
 
-    const messages = conversation.messages.map((message) =>
-      message.id === messageIdToHide
-        ? {
-            ...message,
-            hiddenForUserIds: Array.from(new Set([...(message.hiddenForUserIds || []), viewerId])),
-          }
-        : message,
-    );
-    return {
-      ...conversation,
-      latestPreview: latestPreviewFor(messages, viewerId),
-      latestTime: messages.length ? conversation.latestTime : "Now",
-      messages,
-    };
+  await cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
+    latestPreview: latestPreviewFor(messages, viewerId),
+    updatedAt: timestamp(),
   });
 
-  writeConversations(next);
-  return next.find((conversation) => conversation.id === id) ?? null;
+  return getConversation(id);
 }
 
-export function hideConversationForMe(id: string) {
+export async function hideConversationForMe(id: string) {
+  await ensureCloudbaseLogin();
+  const conversation = await getConversation(id);
+  if (!conversation) {
+    return conversationCache;
+  }
+
   const viewerId = currentOwnerId();
-  const next = getConversations().map((conversation) =>
-    conversation.id === id
-      ? {
-          ...conversation,
-          hiddenForUserIds: Array.from(new Set([...(conversation.hiddenForUserIds || []), viewerId])),
-        }
-      : conversation,
-  );
-
-  writeConversations(next);
-  return next;
-}
-
-export function recallConversationMessage(id: string, messageIdToRecall: string) {
-  const conversations = getConversations();
-  const next = conversations.map((conversation) => {
-    if (conversation.id !== id) {
-      return conversation;
-    }
-
-    const messages = conversation.messages.map((message) =>
-      message.id === messageIdToRecall
-        ? {
-            ...message,
-            text: undefined,
-            imageDataUrl: undefined,
-            recalled: true,
-            hiddenForUserIds: [],
-          }
-        : message,
-    );
-    return {
-      ...conversation,
-      latestPreview: latestPreviewFor(messages),
-      messages,
-    };
+  const hiddenForUserIds = Array.from(new Set([...(conversation.hiddenForUserIds || []), viewerId]));
+  await cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
+    hiddenForUserIds,
+    updatedAt: timestamp(),
   });
-
-  writeConversations(next);
-  return next.find((conversation) => conversation.id === id) ?? null;
-}
-
-export function updateConversationStatus(id: string, status: string) {
-  const conversations = getConversations();
-  const next = conversations.map((conversation) =>
-    conversation.id === id
-      ? {
-          ...conversation,
-          status,
-          matchConfirmations: status === "Open" ? [] : conversation.matchConfirmations,
-        }
-      : conversation,
+  conversationCache = conversationCache.map((item) =>
+    item.id === id ? { ...item, hiddenForUserIds } : item,
   );
-
-  writeConversations(next);
-  return next.find((conversation) => conversation.id === id) ?? null;
+  return conversationCache;
 }
 
-export function confirmConversationMatch(id: string, confirmerId = currentOwnerId()) {
-  const conversations = getConversations();
-  let matchedPostId: string | null = null;
-  const next = conversations.map((conversation) => {
-    if (conversation.id !== id) {
-      return conversation;
-    }
-
-    const confirmations = Array.from(
-      new Set([...(conversation.matchConfirmations || []), confirmerId]),
-    );
-    const required = [conversation.postOwnerId, conversation.starterUserId].filter(Boolean) as string[];
-    const matched = required.length >= 2 && required.every((requiredId) => confirmations.includes(requiredId));
-    if (matched) {
-      matchedPostId = conversation.postId;
-    }
-
-    return {
-      ...conversation,
-      status: matched ? "Matched" : "Open",
-      matchConfirmations: confirmations,
-    };
+export async function recallConversationMessage(id: string, messageIdToRecall: string) {
+  await ensureCloudbaseLogin();
+  await cloudbaseDb.collection(messagesCollectionName).doc(messageIdToRecall).update({
+    text: "",
+    imageDataUrl: "",
+    recalled: true,
+    hiddenForUserIds: [],
   });
+  const conversation = await getConversation(id);
+  if (conversation) {
+    await cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
+      latestPreview: latestPreviewFor(conversation.messages),
+      updatedAt: timestamp(),
+    });
+  }
+  return getConversation(id);
+}
 
-  writeConversations(next);
+export async function updateConversationStatus(id: string, status: string) {
+  await ensureCloudbaseLogin();
+  const nextStatus = status === "Matched" ? "Matched" : "Open";
+  await cloudbaseDb.collection(conversationsCollectionName).doc(id).update(stripUndefined({
+    status: nextStatus,
+    matchConfirmations: nextStatus === "Open" ? [] : undefined,
+    updatedAt: timestamp(),
+  }));
+  return getConversation(id);
+}
+
+export async function confirmConversationMatch(id: string, confirmerId = currentOwnerId()) {
+  await ensureCloudbaseLogin();
+  const conversation = await getConversation(id);
+  if (!conversation) {
+    return { conversation: null, matched: false, postId: null as string | null };
+  }
+
+  const confirmations = Array.from(new Set([...(conversation.matchConfirmations || []), confirmerId]));
+  const required = [conversation.postOwnerId, conversation.starterUserId].filter(Boolean) as string[];
+  const matched = required.length >= 2 && required.every((requiredId) => confirmations.includes(requiredId));
+  await cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
+    status: matched ? "Matched" : "Open",
+    matchConfirmations: confirmations,
+    updatedAt: timestamp(),
+  });
+  const updated = await getConversation(id);
   return {
-    conversation: next.find((conversation) => conversation.id === id) ?? null,
-    matched: Boolean(matchedPostId),
-    postId: matchedPostId,
+    conversation: updated,
+    matched,
+    postId: matched ? conversation.postId : null,
   };
 }
 
-export function cancelConversationMatch(id: string) {
-  const conversations = getConversations();
-  const next = conversations.map((conversation) =>
-    conversation.id === id
-      ? {
-          ...conversation,
-          status: "Open",
-          matchConfirmations: [],
-        }
-      : conversation,
-  );
-
-  writeConversations(next);
-  return next.find((conversation) => conversation.id === id) ?? null;
+export async function cancelConversationMatch(id: string) {
+  await ensureCloudbaseLogin();
+  await cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
+    status: "Open",
+    matchConfirmations: [],
+    updatedAt: timestamp(),
+  });
+  return getConversation(id);
 }

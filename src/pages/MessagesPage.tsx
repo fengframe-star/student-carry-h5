@@ -33,7 +33,7 @@ export default function MessagesPage() {
   const { t } = useLanguage();
   const navigate = useNavigate();
   const [activeCard, setActiveCard] = useState(0);
-  const [conversations, setConversations] = useState(() => visibleConversations());
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [rowSwipe, setRowSwipe] = useState<{ id: string; startX: number; offset: number } | null>(null);
   const [openDeleteId, setOpenDeleteId] = useState<string | null>(null);
@@ -48,8 +48,12 @@ export default function MessagesPage() {
   }, []);
 
   useEffect(() => {
-    setConversations(visibleConversations());
+    void reloadConversations();
   }, []);
+
+  async function reloadConversations() {
+    setConversations(visibleConversations(await getConversations()));
+  }
 
   function goToCard(direction: 1 | -1) {
     setActiveCard((current) => (current + direction + messageCards.length) % messageCards.length);
@@ -90,9 +94,9 @@ export default function MessagesPage() {
     }
   }
 
-  function deleteConversation(id: string) {
-    hideConversationForMe(id);
-    setConversations(visibleConversations());
+  async function deleteConversation(id: string) {
+    await hideConversationForMe(id);
+    await reloadConversations();
     setOpenDeleteId(null);
     setRowSwipe(null);
   }
@@ -245,10 +249,11 @@ export default function MessagesPage() {
   );
 }
 
-function visibleConversations(): Conversation[] {
+function visibleConversations(conversations: Conversation[]): Conversation[] {
   const ownerId = currentOwnerId();
-  return getConversations().filter(
+  return conversations.filter(
     (conversation) =>
+      (conversation.postOwnerId === ownerId || conversation.starterUserId === ownerId) &&
       !conversation.hiddenForUserIds?.includes(ownerId) &&
       !conversation.hiddenForUserIds?.includes(currentUserId),
   );

@@ -23,9 +23,8 @@ import { updateSubmission } from "../lib/submissions";
 export default function ChatDetailPage() {
   const { conversationId } = useParams();
   const { language, t } = useLanguage();
-  const [conversation, setConversation] = useState<Conversation | null>(() =>
-    conversationId ? getConversation(conversationId) : null,
-  );
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [pendingImage, setPendingImage] = useState("");
   const [activeActionMessageId, setActiveActionMessageId] = useState<string | null>(null);
@@ -36,11 +35,18 @@ export default function ChatDetailPage() {
       return;
     }
 
-    markConversationRead(conversationId);
-    setConversation(getConversation(conversationId));
+    const id = conversationId;
+    async function loadConversation() {
+      setLoading(true);
+      await markConversationRead(id);
+      setConversation(await getConversation(id));
+      setLoading(false);
+    }
+
+    void loadConversation();
   }, [conversationId]);
 
-  function handleSend(event: FormEvent<HTMLFormElement>) {
+  async function handleSend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = draft.trim();
 
@@ -49,10 +55,14 @@ export default function ChatDetailPage() {
     }
 
     if (conversation) {
-      setConversation(appendConversationMessage(conversation.id, text || undefined, pendingImage || undefined));
+      setConversation(await appendConversationMessage(conversation.id, text || undefined, pendingImage || undefined));
     }
     setDraft("");
     setPendingImage("");
+  }
+
+  if (loading) {
+    return null;
   }
 
   if (!conversation) {
@@ -98,7 +108,7 @@ export default function ChatDetailPage() {
 
   function canRecall(message: ConversationMessage) {
     return (
-      message.senderId === currentUserId &&
+      (message.senderId === currentOwnerId() || message.senderId === currentUserId) &&
       !message.recalled &&
       Boolean(message.createdAt) &&
       Date.now() - (message.createdAt || 0) <= 120_000
@@ -107,13 +117,13 @@ export default function ChatDetailPage() {
 
   function handleRecall(message: ConversationMessage) {
     if (!message.id || !conversation) return;
-    setConversation(recallConversationMessage(conversation.id, message.id));
+    void recallConversationMessage(conversation.id, message.id).then(setConversation);
     setActiveActionMessageId(null);
   }
 
   function handleLocalDelete(message: ConversationMessage) {
     if (!message.id || !conversation) return;
-    setConversation(hideConversationMessageForMe(conversation.id, message.id));
+    void hideConversationMessageForMe(conversation.id, message.id).then(setConversation);
     setActiveActionMessageId(null);
   }
 
@@ -139,8 +149,8 @@ export default function ChatDetailPage() {
         <button
           type="button"
           disabled={isMatched || hasConfirmed}
-          onClick={() => {
-            const result = confirmConversationMatch(conversation.id, sideId);
+          onClick={async () => {
+            const result = await confirmConversationMatch(conversation.id, sideId);
             setConversation(result.conversation);
             if (result.matched) {
               void updateSubmission(conversation.postId, { status: "Matched" });
@@ -153,8 +163,9 @@ export default function ChatDetailPage() {
         {isMatched || hasConfirmed ? (
           <button
             type="button"
-            onClick={() => {
-              setConversation(cancelConversationMatch(conversation.id));
+            onClick={async () => {
+              const next = await cancelConversationMatch(conversation.id);
+              setConversation(next);
               void updateSubmission(conversation.postId, { status: "Open" });
             }}
             className="pressable mt-1.5 w-full rounded-lg border border-red-300/25 bg-red-500/10 px-3 py-1.5 text-xs font-black text-red-100"
@@ -168,7 +179,7 @@ export default function ChatDetailPage() {
         {conversation.messages
           .filter((message) => !message.hiddenForUserIds?.includes(sideId))
           .map((message) => {
-          const isMe = message.senderId === currentUserId || message.author === "Me";
+          const isMe = message.senderId === sideId || message.senderId === currentUserId || message.author === "Me";
           if (message.recalled) {
             return (
               <p key={message.id} className="text-center text-xs font-semibold text-slate-500">
