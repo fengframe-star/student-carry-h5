@@ -8,7 +8,7 @@ import { useLanguage } from "../lib/language";
 import { isCurrentUserPostOwner, isMatchedStatus, isOpenStatus, localizedStatusLabel } from "../lib/orderAccess";
 import { currentOwnerId, ownerIdForProfile } from "../lib/profile";
 import { deleteSubmission, getSubmissions } from "../lib/submissions";
-import type { CarrierSubmission, RequestSubmission, Submission } from "../types";
+import type { Submission } from "../types";
 
 interface Profile {
   ownerId?: string;
@@ -146,14 +146,8 @@ export default function MyPage() {
     Boolean(profile?.nickname && isCurrentUserPostOwner(submission));
   const isRelatedMatchedPost = (submission: Submission) =>
     isMatchedStatus(submission.status) && matchedPostIds.has(submission.id);
-  const requests = submissions.filter(
-    (submission): submission is RequestSubmission =>
-      submission.type === "request" && (isOwnedByProfile(submission) || isRelatedMatchedPost(submission)),
-  );
-  const carriers = submissions.filter(
-    (submission): submission is CarrierSubmission =>
-      submission.type === "carrier" && (isOwnedByProfile(submission) || isRelatedMatchedPost(submission)),
-  );
+  const matchedPosts = submissions.filter(isRelatedMatchedPost);
+  const myPosts = submissions.filter(isOwnedByProfile);
 
   async function handleDeletePost(id: string) {
     await deleteSubmission(id);
@@ -276,42 +270,32 @@ export default function MyPage() {
           </div>
 
           <PostSection
-            title={t("My requests", "我的帮我带")}
-            subtitle={t("Request posts", "帮我带发布")}
-            empty={t("No request posts yet.", "还没有帮我带发布")}
+            title={t("Matched", "已匹配")}
+            subtitle={t("Matched orders you posted or accepted", "你发布或接单的已匹配订单")}
+            empty={t("No matched orders yet.", "还没有已匹配订单")}
           >
-            {requests.map((item) => (
+            {matchedPosts.map((item) => (
               <OwnPostCard
                 key={item.id}
-                kind={t("Request", "帮我带")}
-                title={item.itemName}
-                route={`${item.fromLocation} → ${item.toLocation}`}
-                meta={`${t("Budget", "预算")}: €${item.budgetEur}`}
+                {...postCardProps(item, t)}
                 status={item.status}
                 owned={isOwnedByProfile(item)}
-                detailTo={`/market/request/${item.id}`}
-                editTo={`/post-request?edit=${item.id}`}
                 onDelete={() => void handleDeletePost(item.id)}
               />
             ))}
           </PostSection>
 
           <PostSection
-            title={t("My carry posts", "我的顺路送")}
-            subtitle={t("Carry posts", "顺路送发布")}
-            empty={t("No carry posts yet.", "还没有顺路送发布")}
+            title={t("My posts", "我的发布")}
+            subtitle={t("All posts you published", "你发布的所有内容")}
+            empty={t("No posts yet.", "还没有发布内容")}
           >
-            {carriers.map((item) => (
+            {myPosts.map((item) => (
               <OwnPostCard
                 key={item.id}
-                kind={t("Carry", "顺路送")}
-                title={item.travelRoute}
-                route={`${t("Space", "空间")}: ${item.availableLuggageSpace}`}
-                meta={`${t("Reward", "报酬")}: ${item.expectedReward}`}
+                {...postCardProps(item, t)}
                 status={item.status}
-                owned={isOwnedByProfile(item)}
-                detailTo={`/market/carry/${item.id}`}
-                editTo={`/carry-earn?edit=${item.id}`}
+                owned
                 onDelete={() => void handleDeletePost(item.id)}
               />
             ))}
@@ -320,6 +304,31 @@ export default function MyPage() {
       )}
     </section>
   );
+}
+
+function postCardProps(
+  item: Submission,
+  t: (en: string, zh: string) => string,
+) {
+  if (item.type === "request") {
+    return {
+      kind: t("Request", "帮我带"),
+      title: item.itemName,
+      route: `${item.fromLocation} → ${item.toLocation}`,
+      meta: `${t("Budget", "预算")}: €${item.budgetEur}`,
+      detailTo: `/market/request/${item.id}`,
+      editTo: `/post-request?edit=${item.id}`,
+    };
+  }
+
+  return {
+    kind: t("Carry", "顺路送"),
+    title: item.travelRoute,
+    route: `${t("Space", "空间")}: ${item.availableLuggageSpace}`,
+    meta: `${t("Reward", "报酬")}: ${item.expectedReward}`,
+    detailTo: `/market/carry/${item.id}`,
+    editTo: `/carry-earn?edit=${item.id}`,
+  };
 }
 
 function OAuthButton({

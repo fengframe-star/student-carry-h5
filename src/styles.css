@@ -354,6 +354,24 @@ a {
   color: #172033;
 }
 
+.theme-light nav.fixed svg {
+  color: #2563eb;
+  filter:
+    drop-shadow(0 0 4px rgb(59 130 246 / 0.42))
+    drop-shadow(0 2px 5px rgb(37 99 235 / 0.14));
+}
+
+.theme-light nav.fixed a {
+  color: #172033;
+}
+
+.theme-light nav.fixed a[aria-current="page"] svg {
+  color: #1d4ed8;
+  filter:
+    drop-shadow(0 0 6px rgb(59 130 246 / 0.5))
+    drop-shadow(0 2px 7px rgb(37 99 235 / 0.18));
+}
+
 .theme-light [class*="bg-[#38bdf8]"] {
   color: #fff !important;
 }
