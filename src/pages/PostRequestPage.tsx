@@ -117,12 +117,16 @@ export default function PostRequestPage() {
     event.preventDefault();
     setState("idle");
     setError("");
-    const submissions = await getSubmissions();
-    setMatches(matchingCarriers({
-      ...form,
-      estimatedValueEur: Number(form.estimatedValueEur),
-      budgetEur: Number(form.budgetEur),
-    }, submissions));
+    try {
+      const submissions = await getSubmissions();
+      setMatches(matchingCarriers({
+        ...form,
+        estimatedValueEur: Number(form.estimatedValueEur),
+        budgetEur: Number(form.budgetEur),
+      }, submissions));
+    } catch {
+      setMatches([]);
+    }
     setShowMatches(true);
   }
 
@@ -304,13 +308,10 @@ export default function PostRequestPage() {
         </label>
         <FormField id="notes" label={t("Notes", "备注")} kind="textarea" placeholder={t("Size, timing, handoff details", "尺寸、时间、交接方式")} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
         <Notice title={t("Privacy", "隐私说明")} tone="info">
-          {t("We do not collect passport numbers or ID documents at MVP stage. Identity verification may be introduced later through a trusted third-party provider.", "MVP 阶段不收集护照号码或身份证件。后续身份验证可能通过可信第三方服务完成。")}
+          {t("Student Carry values user privacy and data security. The platform only collects information necessary for basic matching and communication, and reasonable measures are taken to protect user data.", "Student Carry 重视用户隐私与信息安全。平台仅收集完成基础匹配与沟通所需的信息，并采取合理措施保护用户数据安全。")}
         </Notice>
         <Notice title={t("Prohibited and restricted items", "禁运与限制物品")} tone="warning">
           {t("Dangerous goods, weapons, illegal substances, restricted batteries, large liquids, and gray-market reselling items are not allowed.", "禁止危险品、武器、非法物质、受限制电池、大容量液体、灰产代购或转售物品。")}
-        </Notice>
-        <Notice title={t("Domestic anonymous shipping in China", "中国国内匿名邮寄")} tone="info">
-          {t("If domestic forwarding is needed, users can discuss SF Express anonymous shipping and tracking inside chat. MVP provides guidance only.", "如需中国国内转寄，可在聊天中协商顺丰匿名寄件与运单信息。MVP 阶段平台仅提供指引。")}
         </Notice>
         <label className="flex gap-2 rounded-[18px] bg-sky-400/10 p-3 text-xs leading-5 text-slate-200">
           <input

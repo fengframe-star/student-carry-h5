@@ -14,9 +14,13 @@ export function ensureCloudbaseLogin() {
       const auth = app.auth({ persistence: "local" });
       const loginState = await auth.getLoginState();
       if (!loginState) {
-        const result = await auth.signInAnonymously();
-        if (result.error) {
-          throw new Error(result.error.message || "CloudBase anonymous login failed.");
+        try {
+          const result = await auth.signInAnonymously();
+          if (result.error) {
+            console.warn("CloudBase anonymous login is not available yet.", result.error.message);
+          }
+        } catch (error) {
+          console.warn("CloudBase anonymous login is not available yet.", error);
         }
       }
     })();

@@ -176,11 +176,15 @@ export default function MessagesPage() {
             const offset = activeSwipe ? activeSwipe.offset : openDeleteId === conversation.id ? -68 : 0;
 
             return (
-              <div key={conversation.id} className="relative overflow-hidden rounded-[18px]">
+              <div key={conversation.id} className="relative overflow-hidden rounded-[18px] bg-transparent">
                 <button
                   type="button"
                   onClick={() => deleteConversation(conversation.id)}
-                  className="absolute bottom-0 right-0 top-0 flex w-16 items-center justify-center rounded-[18px] bg-red-500/90 text-[0.68rem] font-black text-white"
+                  aria-hidden={offset === 0}
+                  tabIndex={offset === 0 ? -1 : 0}
+                  className={`absolute bottom-0 right-0 top-0 flex w-16 items-center justify-center rounded-[18px] bg-red-500/90 text-[0.68rem] font-black text-white transition-opacity ${
+                    offset === 0 ? "pointer-events-none opacity-0" : "opacity-100"
+                  }`}
                 >
                   {t("Delete", "删除")}
                 </button>
