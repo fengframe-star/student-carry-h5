@@ -270,6 +270,25 @@ a {
   animation: active-dot-pulse 1.8s ease-out infinite;
 }
 
+.nav-unread-dot {
+  position: absolute;
+  right: -4px;
+  top: -4px;
+  width: 0.48rem;
+  height: 0.48rem;
+  border-radius: 999px;
+  background: #2563eb;
+  box-shadow:
+    0 0 0 2px rgb(20 24 39 / 0.96),
+    0 0 10px rgb(37 99 235 / 0.7);
+}
+
+.theme-light .nav-unread-dot {
+  box-shadow:
+    0 0 0 2px rgb(255 255 255 / 0.96),
+    0 0 10px rgb(37 99 235 / 0.58);
+}
+
 .theme-light .language-picker::before {
   background: linear-gradient(90deg, rgb(248 250 252 / 0), rgb(255 255 255 / 0.92) 28%, rgb(255 255 255 / 0.92));
 }

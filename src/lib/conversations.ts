@@ -176,6 +176,14 @@ function normalizeMessage(message: Record<string, unknown>, index: number): Conv
 
 function normalizeConversation(data: Record<string, unknown>, messages: ConversationMessage[] = []): Conversation {
   const createdAt = typeof data.createdAt === "number" ? data.createdAt : undefined;
+  const viewerId = currentOwnerId();
+  const unreadFromMessages = messages.some(
+    (message) =>
+      message.senderId !== viewerId &&
+      !message.recalled &&
+      !message.hiddenForUserIds?.includes(viewerId) &&
+      !message.readByUserIds?.includes(viewerId),
+  );
   return {
     id: String(data._id || data.id || ""),
     postType: data.postType === "carry" ? "carry" : "request",
@@ -192,7 +200,7 @@ function normalizeConversation(data: Record<string, unknown>, messages: Conversa
       : [],
     latestPreview: String(data.latestPreview || ""),
     latestTime: String(data.latestTime || timeLabel(createdAt)),
-    unread: Boolean(data.unread),
+    unread: unreadFromMessages,
     hiddenForUserIds: Array.isArray(data.hiddenForUserIds)
       ? (data.hiddenForUserIds as string[])
       : [],
@@ -337,11 +345,32 @@ function receiverIdFor(conversation: Conversation, senderId: string) {
 }
 
 export async function markConversationRead(id: string) {
+  const viewerId = currentOwnerId();
   try {
     await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
+    const messages = await readMessages(id);
+    await Promise.all(
+      messages
+        .filter(
+          (message) =>
+            message.id &&
+            message.senderId !== viewerId &&
+            !message.readByUserIds?.includes(viewerId),
+        )
+        .map((message) =>
+          cloudbaseDb
+            .collection(messagesCollectionName)
+            .doc(message.id!)
+            .update({
+              read: true,
+              readByUserIds: Array.from(new Set([...(message.readByUserIds || []), viewerId])),
+            }),
+        ),
+    );
     await withTimeout(
       cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
         unread: false,
+        unreadForUserIds: [],
         updatedAt: timestamp(),
       }),
       "Mark conversation read",
@@ -350,7 +379,17 @@ export async function markConversationRead(id: string) {
     updateLocalConversation(id, (conversation) => ({ ...conversation, unread: false }));
   }
   conversationCache = conversationCache.map((conversation) =>
-    conversation.id === id ? { ...conversation, unread: false } : conversation,
+    conversation.id === id
+      ? {
+          ...conversation,
+          unread: false,
+          messages: conversation.messages.map((message) =>
+            message.senderId !== viewerId
+              ? { ...message, read: true, readByUserIds: Array.from(new Set([...(message.readByUserIds || []), viewerId])) }
+              : message,
+          ),
+        }
+      : conversation,
   );
 }
 
@@ -440,6 +479,85 @@ export async function subscribeConversationMessages(
         const message = error instanceof Error ? error.message : String(error);
         console.error("CloudBase message listener failed.", error);
         handlers.onError(`Message sync failed: ${message}`);
+      },
+    });
+
+  return () => listener.close();
+}
+
+export async function subscribeConversations(
+  handlers: {
+    onConversations: (conversations: Conversation[]) => void;
+    onError?: (message: string) => void;
+  },
+) {
+  await ensureCloudbaseLogin();
+
+  const listener = cloudbaseDb
+    .collection(conversationsCollectionName)
+    .orderBy("updatedAt", "desc")
+    .watch({
+      onChange: (snapshot: { docs?: Record<string, unknown>[] }) => {
+        void Promise.all(
+          (snapshot.docs || []).map(async (data) =>
+            normalizeConversation(data, await readMessages(String(data._id || data.id || ""))),
+          ),
+        ).then((conversations) => {
+          conversationCache = conversations;
+          handlers.onConversations(conversations);
+        }).catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error);
+          console.error("CloudBase conversation listener hydration failed.", error);
+          handlers.onError?.(`Conversation sync failed: ${message}`);
+        });
+      },
+      onError: (error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("CloudBase conversation listener failed.", error);
+        handlers.onError?.(`Conversation sync failed: ${message}`);
+      },
+    });
+
+  return () => listener.close();
+}
+
+export async function subscribeUnreadMessages(
+  handlers: {
+    onUnread: (unreadConversationIds: string[]) => void;
+    onError?: (message: string) => void;
+  },
+) {
+  await ensureCloudbaseLogin();
+  const viewerId = currentOwnerId();
+  if (!viewerId) {
+    handlers.onUnread([]);
+    return () => {};
+  }
+
+  const listener = cloudbaseDb
+    .collection(messagesCollectionName)
+    .where({ receiverId: viewerId })
+    .watch({
+      onChange: (snapshot: { docs?: Record<string, unknown>[] }) => {
+        const unreadConversationIds = new Set<string>();
+        (snapshot.docs || []).forEach((doc, index) => {
+          const message = normalizeMessage(doc, index);
+          const conversationId = typeof doc.conversationId === "string" ? doc.conversationId : "";
+          if (
+            conversationId &&
+            !message.recalled &&
+            !message.hiddenForUserIds?.includes(viewerId) &&
+            !message.readByUserIds?.includes(viewerId)
+          ) {
+            unreadConversationIds.add(conversationId);
+          }
+        });
+        handlers.onUnread(Array.from(unreadConversationIds));
+      },
+      onError: (error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("CloudBase unread listener failed.", error);
+        handlers.onError?.(`Unread sync failed: ${message}`);
       },
     });
 

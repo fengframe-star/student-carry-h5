@@ -12,6 +12,7 @@ export type StoredProfile = {
   studentVerification?: boolean;
   identityVerified?: boolean;
   verificationLater?: string;
+  legalAgreementAcceptedAt?: number;
 };
 
 const profileKey = "studentCarryProfile";

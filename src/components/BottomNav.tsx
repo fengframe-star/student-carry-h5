@@ -1,6 +1,9 @@
 import { Home, MessageCircle, Store, UserRound } from "lucide-react";
+import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { subscribeUnreadMessages } from "../lib/conversations";
 import { useLanguage } from "../lib/language";
+import { isLoggedIn } from "../lib/profile";
 
 const items = [
   { to: "/", label: "Home", icon: Home },
@@ -12,6 +15,28 @@ const items = [
 export default function BottomNav() {
   const { t } = useLanguage();
   const location = useLocation();
+  const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    if (!isLoggedIn()) {
+      setHasUnreadMessages(false);
+      return undefined;
+    }
+
+    void subscribeUnreadMessages({
+      onUnread: (ids) => setHasUnreadMessages(ids.length > 0),
+    }).then((close) => {
+      unsubscribe = close;
+    }).catch((error: unknown) => {
+      console.error("Unread navigation sync failed.", error);
+      setHasUnreadMessages(false);
+    });
+
+    return () => {
+      unsubscribe?.();
+    };
+  }, [location.pathname]);
 
   if (
     location.pathname.startsWith("/market/request/") ||
@@ -42,7 +67,10 @@ export default function BottomNav() {
                 ].join(" ")
               }
             >
-              <Icon size={20} aria-hidden="true" />
+              <span className="relative">
+                <Icon size={20} aria-hidden="true" />
+                {item.to === "/messages" && hasUnreadMessages ? <span className="nav-unread-dot" /> : null}
+              </span>
               <span className="mt-1">
                 {item.label === "Home"
                   ? t("Home", "首页")

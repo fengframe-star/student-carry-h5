@@ -13,6 +13,8 @@ import MessagesPage from "./pages/MessagesPage";
 import ChatDetailPage from "./pages/ChatDetailPage";
 import RequestDetailPage from "./pages/RequestDetailPage";
 import CarryDetailPage from "./pages/CarryDetailPage";
+import TermsPage from "./pages/TermsPage";
+import PrivacyPolicyPage from "./pages/PrivacyPolicyPage";
 import "./styles.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
@@ -30,6 +32,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <Route path="post-request" element={<PostRequestPage />} />
           <Route path="carry-earn" element={<CarryEarnPage />} />
           <Route path="register" element={<RegisterPage />} />
+          <Route path="terms" element={<TermsPage />} />
+          <Route path="privacy" element={<PrivacyPolicyPage />} />
           <Route path="admin" element={<AdminDashboardPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

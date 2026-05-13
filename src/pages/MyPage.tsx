@@ -1,7 +1,19 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Mail, Phone } from "lucide-react";
-import { sendLoginCode, signOut as cloudSignOut, isProfileComplete, saveProfile, verifyLoginCode, type LoginMethod, type PendingOtpLogin } from "../lib/auth";
+import {
+  checkAccountStatus,
+  createAccountWithPassword,
+  sendCreateAccountCode,
+  sendPasswordResetCode,
+  signInWithAccountPassword,
+  signOut as cloudSignOut,
+  isProfileComplete,
+  saveProfile,
+  resetPasswordAndSignIn,
+  type LoginMethod,
+  type PendingPasswordReset,
+} from "../lib/auth";
 import { getConversations } from "../lib/conversations";
 import { useLanguage } from "../lib/language";
 import { isCurrentUserPostOwner, isMatchedStatus, isOpenStatus, localizedStatusLabel } from "../lib/orderAccess";
@@ -22,22 +34,29 @@ interface Profile {
   studentVerification?: boolean;
   identityVerified?: boolean;
   verificationLater?: string;
+  legalAgreementAcceptedAt?: number;
 }
 
 export default function MyPage() {
   const { t } = useLanguage();
   const [profile, setProfile] = useState<Profile | null>(() => readProfile());
   const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
+  const [authStep, setAuthStep] = useState<"account" | "password" | "register" | "forgot">("account");
   const [account, setAccount] = useState("");
+  const [normalizedAccount, setNormalizedAccount] = useState("");
   const [code, setCode] = useState("");
-  const [pendingLogin, setPendingLogin] = useState<PendingOtpLogin | null>(null);
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [createVerificationId, setCreateVerificationId] = useState("");
+  const [pendingReset, setPendingReset] = useState<PendingPasswordReset | null>(null);
+  const [legalAccepted, setLegalAccepted] = useState(false);
   const [profileForm, setProfileForm] = useState({
     nickname: profile?.nickname || "",
     currentCity: profile?.currentCity || "",
     schoolOrUniversity: profile?.schoolOrUniversity || "",
   });
   const [loginError, setLoginError] = useState("");
-  const [authState, setAuthState] = useState<"idle" | "sending" | "verifying" | "saving">("idle");
+  const [authState, setAuthState] = useState<"idle" | "checking" | "sending" | "verifying" | "saving">("idle");
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [conversations, setConversations] = useState<Awaited<ReturnType<typeof getConversations>>>([]);
 
@@ -58,33 +77,59 @@ export default function MyPage() {
     setProfile(null);
     setSubmissions([]);
     setConversations([]);
-    setPendingLogin(null);
+    setAuthStep("account");
     setCode("");
+    setPassword("");
+    setConfirmPassword("");
+    setCreateVerificationId("");
+    setPendingReset(null);
   }
 
-  async function handleSendCode(event: FormEvent) {
+  function resetAuthInputs() {
+    setCode("");
+    setPassword("");
+    setConfirmPassword("");
+    setCreateVerificationId("");
+    setPendingReset(null);
+    setLoginError("");
+  }
+
+  function requireRegistrationAgreement() {
+    if (legalAccepted) return true;
+    setLoginError(t("Please read and agree to the Terms of Service and Privacy Policy first.", "请先阅读并同意服务条款和隐私政策。"));
+    return false;
+  }
+
+  async function handleContinue(event: FormEvent) {
     event.preventDefault();
     setLoginError("");
-    setAuthState("sending");
+    setAuthState("checking");
 
     try {
-      setPendingLogin(await sendLoginCode(loginMethod, account));
+      const result = await checkAccountStatus(loginMethod, account);
+      setNormalizedAccount(result.account);
+      resetAuthInputs();
+      if (result.exists) {
+        setAuthStep("password");
+      } else {
+        setAuthState("sending");
+        setCreateVerificationId(await sendCreateAccountCode(loginMethod, result.account));
+        setAuthStep("register");
+      }
     } catch (error) {
-      setLoginError(error instanceof Error ? error.message : "Unable to send verification code.");
+      setLoginError(error instanceof Error ? error.message : "Unable to continue.");
     } finally {
       setAuthState("idle");
     }
   }
 
-  async function handleVerifyCode(event: FormEvent) {
+  async function handlePasswordLogin(event: FormEvent) {
     event.preventDefault();
-    if (!pendingLogin) return;
-
     setLoginError("");
     setAuthState("verifying");
 
     try {
-      const nextProfile = await verifyLoginCode(pendingLogin, code);
+      const nextProfile = await signInWithAccountPassword(loginMethod, normalizedAccount, password);
       setProfile(nextProfile);
       setProfileForm({
         nickname: nextProfile.nickname || "",
@@ -92,7 +137,73 @@ export default function MyPage() {
         schoolOrUniversity: nextProfile.schoolOrUniversity || "",
       });
     } catch (error) {
-      setLoginError(error instanceof Error ? error.message : "Unable to verify code.");
+      setLoginError(error instanceof Error ? error.message : "Unable to log in.");
+    } finally {
+      setAuthState("idle");
+    }
+  }
+
+  async function handleStartForgotPassword() {
+    setLoginError("");
+    setAuthState("sending");
+    try {
+      setPendingReset(await sendPasswordResetCode(normalizedAccount));
+      setCode("");
+      setPassword("");
+      setConfirmPassword("");
+      setAuthStep("forgot");
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "Unable to send reset code.");
+    } finally {
+      setAuthState("idle");
+    }
+  }
+
+  async function handleRegister(event: FormEvent) {
+    event.preventDefault();
+    if (!requireRegistrationAgreement()) return;
+    if (password !== confirmPassword) {
+      setLoginError(t("Passwords do not match.", "两次密码不一致。"));
+      return;
+    }
+
+    setLoginError("");
+    setAuthState("verifying");
+    try {
+      const nextProfile = await createAccountWithPassword(loginMethod, normalizedAccount, createVerificationId, code, password, Date.now());
+      setProfile(nextProfile);
+      setProfileForm({
+        nickname: nextProfile.nickname || "",
+        currentCity: nextProfile.currentCity || "",
+        schoolOrUniversity: nextProfile.schoolOrUniversity || "",
+      });
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "Unable to create account.");
+    } finally {
+      setAuthState("idle");
+    }
+  }
+
+  async function handleResetPassword(event: FormEvent) {
+    event.preventDefault();
+    if (!pendingReset) return;
+    if (password !== confirmPassword) {
+      setLoginError(t("Passwords do not match.", "两次密码不一致。"));
+      return;
+    }
+
+    setLoginError("");
+    setAuthState("verifying");
+    try {
+      const nextProfile = await resetPasswordAndSignIn(loginMethod, pendingReset, code, password);
+      setProfile(nextProfile);
+      setProfileForm({
+        nickname: nextProfile.nickname || "",
+        currentCity: nextProfile.currentCity || "",
+        schoolOrUniversity: nextProfile.schoolOrUniversity || "",
+      });
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "Unable to reset password.");
     } finally {
       setAuthState("idle");
     }
@@ -157,7 +268,7 @@ export default function MyPage() {
             <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{t("My account", "我的")}</p>
             <h2 className="mt-1 text-lg font-black text-white">{t("Sign in to continue", "登录后继续")}</h2>
             <p className="mt-1 text-xs leading-5 text-slate-400">
-              {t("Use email code or Mainland China SMS code. New accounts are created automatically.", "使用邮箱验证码或中国大陆手机号短信验证码。新账号会自动创建。")}
+              {t("Continue with email or Mainland China phone. Existing accounts use password; new accounts verify and create a password.", "使用邮箱或中国大陆手机号继续。已有账号使用密码登录，新账号验证码验证后设置密码。")}
             </p>
 
             <div className="mt-3 grid grid-cols-2 gap-2">
@@ -165,7 +276,8 @@ export default function MyPage() {
                 type="button"
                 onClick={() => {
                   setLoginMethod("email");
-                  setPendingLogin(null);
+                  setAuthStep("account");
+                  resetAuthInputs();
                 }}
                 className={`pressable flex min-h-10 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-black ${
                   loginMethod === "email" ? "border-sky-300/40 bg-sky-400/20 text-sky-50" : "border-white/15 bg-white/10 text-white"
@@ -178,7 +290,8 @@ export default function MyPage() {
                 type="button"
                 onClick={() => {
                   setLoginMethod("phone");
-                  setPendingLogin(null);
+                  setAuthStep("account");
+                  resetAuthInputs();
                 }}
                 className={`pressable flex min-h-10 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-black ${
                   loginMethod === "phone" ? "border-sky-300/40 bg-sky-400/20 text-sky-50" : "border-white/15 bg-white/10 text-white"
@@ -189,8 +302,8 @@ export default function MyPage() {
               </button>
             </div>
 
-            {!pendingLogin ? (
-              <form onSubmit={handleSendCode} className="slide-down-panel mt-3 grid gap-3 rounded-[18px] border border-white/10 bg-white/[0.04] p-3">
+            {authStep === "account" ? (
+              <form onSubmit={handleContinue} className="slide-down-panel mt-3 grid gap-3 rounded-[18px] border border-white/10 bg-white/[0.04] p-3">
                 <label className="block">
                   <span className="text-xs font-semibold text-slate-100">
                     {loginMethod === "email" ? t("Email address", "邮箱地址") : t("Mainland China phone number", "中国大陆手机号")}
@@ -206,14 +319,51 @@ export default function MyPage() {
                 </label>
                 <button
                   type="submit"
-                  disabled={authState === "sending"}
+                  disabled={authState === "checking" || authState === "sending"}
                   className="pressable min-h-10 rounded-xl bg-[#38bdf8] px-3 text-xs font-black text-white disabled:opacity-60"
                 >
-                  {authState === "sending" ? t("Sending...", "发送中...") : t("Send verification code", "发送验证码")}
+                  {authState === "checking" || authState === "sending" ? t("Checking...", "检查中...") : t("Continue", "继续")}
                 </button>
               </form>
-            ) : (
-              <form onSubmit={handleVerifyCode} className="slide-down-panel mt-3 grid gap-3 rounded-[18px] border border-white/10 bg-white/[0.04] p-3">
+            ) : null}
+
+            {authStep === "password" ? (
+              <form onSubmit={handlePasswordLogin} className="slide-down-panel mt-3 grid gap-3 rounded-[18px] border border-white/10 bg-white/[0.04] p-3">
+                <p className="text-xs font-bold text-slate-400">{normalizedAccount}</p>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-100">{t("Password", "密码")}</span>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={authState === "verifying"}
+                  className="pressable min-h-10 rounded-xl bg-[#38bdf8] px-3 text-xs font-black text-white disabled:opacity-60"
+                >
+                  {authState === "verifying" ? t("Logging in...", "登录中...") : t("Log in", "登录")}
+                </button>
+                <div className="flex items-center justify-between text-xs font-black">
+                  <button type="button" onClick={() => setAuthStep("account")} className="text-slate-300">
+                    {t("Use another account", "使用其他账号")}
+                  </button>
+                  <button type="button" onClick={() => void handleStartForgotPassword()} className="text-sky-200">
+                    {t("Forgot password?", "忘记密码？")}
+                  </button>
+                </div>
+              </form>
+            ) : null}
+
+            {authStep === "register" ? (
+              <form onSubmit={handleRegister} className="slide-down-panel mt-3 grid gap-3 rounded-[18px] border border-white/10 bg-white/[0.04] p-3">
+                <p className="text-xs font-bold text-slate-400">
+                  {t("Create account", "创建账号")} · {normalizedAccount}
+                </p>
                 <label className="block">
                   <span className="text-xs font-semibold text-slate-100">{t("Verification code", "验证码")}</span>
                   <input
@@ -225,25 +375,121 @@ export default function MyPage() {
                     className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]"
                   />
                 </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-100">{t("Create password", "设置密码")}</span>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-100">{t("Confirm password", "确认密码")}</span>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]"
+                  />
+                </label>
+                <label className="flex items-start gap-2 rounded-[18px] border border-white/10 bg-white/[0.04] p-3 text-xs leading-5 text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={legalAccepted}
+                    onChange={(event) => {
+                      setLegalAccepted(event.target.checked);
+                      if (event.target.checked) setLoginError("");
+                    }}
+                    className="mt-1 h-4 w-4 rounded border-white/20 bg-white/10 accent-[#38bdf8]"
+                  />
+                  <span>
+                    {t("I have read and agree to the ", "我已阅读并同意")}
+                    <Link to="/terms" className="font-black text-sky-200 underline decoration-sky-200/40 underline-offset-2">
+                      {t("Terms of Service", "服务条款")}
+                    </Link>
+                    {t(" and ", "和")}
+                    <Link to="/privacy" className="font-black text-sky-200 underline decoration-sky-200/40 underline-offset-2">
+                      {t("Privacy Policy", "隐私政策")}
+                    </Link>
+                    {t(".", "。")}
+                  </span>
+                </label>
                 <button
                   type="submit"
-                  disabled={authState === "verifying"}
+                  disabled={authState === "verifying" || !legalAccepted}
                   className="pressable min-h-10 rounded-xl bg-[#38bdf8] px-3 text-xs font-black text-white disabled:opacity-60"
                 >
-                  {authState === "verifying" ? t("Verifying...", "验证中...") : t("Log in / create account", "登录 / 自动注册")}
+                  {authState === "verifying" ? t("Creating...", "创建中...") : t("Create account", "创建账号")}
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    setPendingLogin(null);
-                    setCode("");
+                    setAuthStep("account");
+                    resetAuthInputs();
                   }}
                   className="text-xs font-black text-sky-200"
                 >
                   {t("Use another account", "使用其他账号")}
                 </button>
               </form>
-            )}
+            ) : null}
+
+            {authStep === "forgot" ? (
+              <form onSubmit={handleResetPassword} className="slide-down-panel mt-3 grid gap-3 rounded-[18px] border border-white/10 bg-white/[0.04] p-3">
+                <p className="text-xs font-bold text-slate-400">
+                  {t("Reset password", "重置密码")} · {normalizedAccount}
+                </p>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-100">{t("Verification code", "验证码")}</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    value={code}
+                    onChange={(event) => setCode(event.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-100">{t("New password", "新密码")}</span>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-100">{t("Confirm new password", "确认新密码")}</span>
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={authState === "verifying"}
+                  className="pressable min-h-10 rounded-xl bg-[#38bdf8] px-3 text-xs font-black text-white disabled:opacity-60"
+                >
+                  {authState === "verifying" ? t("Resetting...", "重置中...") : t("Reset password and log in", "重置密码并登录")}
+                </button>
+                <button type="button" onClick={() => setAuthStep("password")} className="text-xs font-black text-sky-200">
+                  {t("Back to password login", "返回密码登录")}
+                </button>
+              </form>
+            ) : null}
+
           </div>
 
           {loginError && (

@@ -60,7 +60,20 @@ export default function ChatDetailPage() {
         setConversation(nextConversation);
         unsubscribe = await subscribeConversationMessages(id, {
           onMessages: (messages) => {
-            setConversation((current) => current ? { ...current, messages } : current);
+            setConversation((current) => {
+              if (!current) return current;
+              if (messages.length === 0 && current.messages.length > 0) return current;
+              return { ...current, messages };
+            });
+            if (
+              messages.some(
+                (message) =>
+                  message.senderId !== currentOwnerId() &&
+                  !message.readByUserIds?.includes(currentOwnerId()),
+              )
+            ) {
+              void markConversationRead(id);
+            }
           },
           onError: setSyncError,
         });

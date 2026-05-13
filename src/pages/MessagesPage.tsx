@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { BadgeEuro, Clock3, MapPin } from "lucide-react";
-import { currentUserId, getConversations, hideConversationForMe, type Conversation } from "../lib/conversations";
+import { currentUserId, getConversations, hideConversationForMe, subscribeConversations, subscribeUnreadMessages, type Conversation } from "../lib/conversations";
 import { useLanguage } from "../lib/language";
 import { currentOwnerId, isLoggedIn } from "../lib/profile";
 
@@ -49,9 +49,42 @@ export default function MessagesPage() {
   }, []);
 
   useEffect(() => {
+    let unsubscribeUnread: (() => void) | undefined;
+    let unsubscribeConversations: (() => void) | undefined;
     if (isLoggedIn()) {
       void reloadConversations();
+      void subscribeConversations({
+        onConversations: (nextConversations) => setConversations(visibleConversations(nextConversations)),
+        onError: (message) => setSyncError(message),
+      }).then((close) => {
+        unsubscribeConversations = close;
+      }).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setSyncError(t("Unable to connect to conversation sync.", "无法连接对话同步。") + ` ${message}`);
+      });
+      void subscribeUnreadMessages({
+        onUnread: (ids) => {
+          const unreadIds = new Set(ids);
+          setConversations((current) =>
+            current.map((conversation) => ({
+              ...conversation,
+              unread: unreadIds.has(conversation.id),
+            })),
+          );
+        },
+        onError: (message) => setSyncError(message),
+      }).then((close) => {
+        unsubscribeUnread = close;
+      }).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        setSyncError(t("Unable to connect to unread sync.", "无法连接未读同步。") + ` ${message}`);
+      });
     }
+
+    return () => {
+      unsubscribeUnread?.();
+      unsubscribeConversations?.();
+    };
   }, []);
 
   async function reloadConversations() {
