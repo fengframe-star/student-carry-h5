@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { BadgeEuro, Clock3, MapPin } from "lucide-react";
 import { currentUserId, getConversations, hideConversationForMe, type Conversation } from "../lib/conversations";
 import { useLanguage } from "../lib/language";
-import { currentOwnerId } from "../lib/profile";
+import { currentOwnerId, isLoggedIn } from "../lib/profile";
 
 const messageCards = [
   {
@@ -38,6 +38,7 @@ export default function MessagesPage() {
   const [rowSwipe, setRowSwipe] = useState<{ id: string; startX: number; offset: number } | null>(null);
   const [openDeleteId, setOpenDeleteId] = useState<string | null>(null);
   const [suppressClickId, setSuppressClickId] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState("");
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -48,11 +49,21 @@ export default function MessagesPage() {
   }, []);
 
   useEffect(() => {
-    void reloadConversations();
+    if (isLoggedIn()) {
+      void reloadConversations();
+    }
   }, []);
 
   async function reloadConversations() {
-    setConversations(visibleConversations(await getConversations()));
+    try {
+      setSyncError("");
+      setConversations(visibleConversations(await getConversations()));
+    } catch (error) {
+      console.error("Message list sync failed.", error);
+      const message = error instanceof Error ? error.message : String(error);
+      setSyncError(t("Unable to load conversations from CloudBase.", "无法从 CloudBase 加载对话。") + ` ${message}`);
+      setConversations([]);
+    }
   }
 
   function goToCard(direction: 1 | -1) {
@@ -110,6 +121,12 @@ export default function MessagesPage() {
           {t("Confirm price, place, timing, and handoff details.", "确认价格、地点、时间和交接细节。")}
         </p>
       </div>
+
+      {syncError ? (
+        <div className="mt-4 rounded-[18px] border border-red-300/25 bg-red-500/10 px-3 py-2 text-xs font-semibold leading-5 text-red-100">
+          {syncError}
+        </div>
+      ) : null}
 
       <div
         className="mt-5 overflow-hidden"
@@ -237,6 +254,20 @@ export default function MessagesPage() {
               </div>
             );
           })}
+        </div>
+      ) : !isLoggedIn() ? (
+        <div className="mt-4 rounded-[22px] border border-white/10 bg-[#1f2232]/90 p-4 text-center shadow-xl">
+          <h2 className="text-sm font-black text-white">{t("Log in to use messages", "登录后使用消息")}</h2>
+          <p className="mt-2 text-xs leading-5 text-slate-400">
+            {t("Guests can browse Market, but chatting requires an account.", "游客可以浏览集市，聊天需要登录账号。")}
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate("/my")}
+            className="pressable mt-3 rounded-xl bg-[#38bdf8] px-4 py-2 text-xs font-black text-white"
+          >
+            {t("Log in", "登录")}
+          </button>
         </div>
       ) : (
         <div className="mt-4 rounded-[22px] border border-white/10 bg-[#1f2232]/90 p-4 text-center shadow-xl">

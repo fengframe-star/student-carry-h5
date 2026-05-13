@@ -5,9 +5,14 @@ export type ConversationMessage = {
   id?: string;
   author: "Post owner" | "Me";
   senderId?: string;
+  receiverId?: string;
   text?: string;
+  imageUrl?: string;
   imageDataUrl?: string;
+  type?: "text" | "image";
   createdAt?: number;
+  read?: boolean;
+  readByUserIds?: string[];
   recalled?: boolean;
   hiddenForUserIds?: string[];
 };
@@ -38,6 +43,8 @@ export type ConversationInput = Omit<
 
 const conversationsCollectionName = "conversations";
 const messagesCollectionName = "messages";
+const localConversationsKey = "studentCarryCloudFallbackConversations";
+const cloudTimeoutMs = 3500;
 export const currentUserId = "me";
 
 let conversationCache: Conversation[] = [];
@@ -48,6 +55,65 @@ function timestamp() {
 
 function messageId() {
   return `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function canUseStorage() {
+  return typeof window !== "undefined";
+}
+
+function readLocalConversations() {
+  if (!canUseStorage()) {
+    return [];
+  }
+
+  try {
+    return (JSON.parse(window.localStorage.getItem(localConversationsKey) || "[]") as Conversation[]).map(
+      (conversation) => normalizeConversation(conversation as unknown as Record<string, unknown>, conversation.messages || []),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalConversations(conversations: Conversation[]) {
+  if (!canUseStorage()) {
+    return;
+  }
+
+  window.localStorage.setItem(localConversationsKey, JSON.stringify(conversations));
+  conversationCache = conversations;
+}
+
+function saveLocalConversation(conversation: Conversation) {
+  const conversations = readLocalConversations();
+  writeLocalConversations([
+    conversation,
+    ...conversations.filter((item) => item.id !== conversation.id),
+  ]);
+}
+
+function updateLocalConversation(id: string, updater: (conversation: Conversation) => Conversation) {
+  const conversations = readLocalConversations();
+  const next = conversations.map((conversation) =>
+    conversation.id === id ? updater(conversation) : conversation,
+  );
+  writeLocalConversations(next);
+  return next.find((conversation) => conversation.id === id) ?? null;
+}
+
+async function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  let timeoutId: number | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(`${label} timed out`)), cloudTimeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) {
+      window.clearTimeout(timeoutId);
+    }
+  }
 }
 
 function stripUndefined<T>(value: T): T {
@@ -80,13 +146,27 @@ function timeLabel(createdAt?: number) {
 }
 
 function normalizeMessage(message: Record<string, unknown>, index: number): ConversationMessage {
+  const senderId = String(message.senderId || (message.author === "Me" ? currentUserId : "other-user"));
+  const imageUrl = typeof message.imageUrl === "string"
+    ? message.imageUrl
+    : typeof message.imageDataUrl === "string"
+      ? message.imageDataUrl
+      : undefined;
+
   return {
     id: String(message._id || message.id || `legacy-${index}`),
-    author: message.author === "Post owner" ? "Post owner" : "Me",
-    senderId: String(message.senderId || (message.author === "Me" ? currentUserId : "other-user")),
+    author: senderId === currentOwnerId() || senderId === currentUserId ? "Me" : "Post owner",
+    senderId,
+    receiverId: typeof message.receiverId === "string" ? message.receiverId : undefined,
     text: typeof message.text === "string" ? message.text : undefined,
-    imageDataUrl: typeof message.imageDataUrl === "string" ? message.imageDataUrl : undefined,
+    imageUrl,
+    imageDataUrl: imageUrl,
+    type: message.type === "image" || imageUrl ? "image" : "text",
     createdAt: typeof message.createdAt === "number" ? message.createdAt : 0,
+    read: Boolean(message.read),
+    readByUserIds: Array.isArray(message.readByUserIds)
+      ? (message.readByUserIds as string[])
+      : [],
     recalled: Boolean(message.recalled),
     hiddenForUserIds: Array.isArray(message.hiddenForUserIds)
       ? (message.hiddenForUserIds as string[])
@@ -137,17 +217,25 @@ function latestPreviewFor(messages: ConversationMessage[], viewerId = currentOwn
 }
 
 async function readMessages(conversationId: string) {
-  const result = await cloudbaseDb
-    .collection(messagesCollectionName)
-    .where({ conversationId })
-    .orderBy("createdAt", "asc")
-    .get();
+  const result = await withTimeout(
+    cloudbaseDb
+      .collection(messagesCollectionName)
+      .where({ conversationId })
+      .orderBy("createdAt", "asc")
+      .get(),
+    "Read messages",
+  );
 
-  return (result.data || []).map(normalizeMessage);
+  return (result.data || [])
+    .map(normalizeMessage)
+    .sort((first, second) => (first.createdAt || 0) - (second.createdAt || 0));
 }
 
 async function readConversationDocument(id: string) {
-  const result = await cloudbaseDb.collection(conversationsCollectionName).doc(id).get();
+  const result = await withTimeout(
+    cloudbaseDb.collection(conversationsCollectionName).doc(id).get(),
+    "Read conversation document",
+  );
   return result.data?.[0] as Record<string, unknown> | undefined;
 }
 
@@ -156,38 +244,52 @@ export function getCachedConversations() {
 }
 
 export async function getConversations() {
-  await ensureCloudbaseLogin();
-  const result = await cloudbaseDb
-    .collection(conversationsCollectionName)
-    .orderBy("updatedAt", "desc")
-    .get();
+  try {
+    await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
+    const result = await withTimeout(
+      cloudbaseDb
+        .collection(conversationsCollectionName)
+        .orderBy("updatedAt", "desc")
+        .get(),
+      "Read conversations",
+    );
 
-  const conversations = await Promise.all(
-    (result.data || []).map(async (data: Record<string, unknown>) =>
-      normalizeConversation(data, await readMessages(String(data._id || data.id || ""))),
-    ),
-  );
-  conversationCache = conversations;
-  return conversations;
+    const conversations = await Promise.all(
+      (result.data || []).map(async (data: Record<string, unknown>) =>
+        normalizeConversation(data, await readMessages(String(data._id || data.id || ""))),
+      ),
+    );
+    conversationCache = conversations;
+    return conversations;
+  } catch (error) {
+    console.error("CloudBase conversations read failed.", error);
+    throw error;
+  }
 }
 
 export async function getConversation(id: string) {
-  await ensureCloudbaseLogin();
-  const data = await readConversationDocument(id);
-  if (!data) {
-    return null;
-  }
+  const cached = conversationCache.find((conversation) => conversation.id === id);
 
-  const conversation = normalizeConversation(data, await readMessages(id));
-  conversationCache = [
-    conversation,
-    ...conversationCache.filter((cached) => cached.id !== conversation.id),
-  ];
-  return conversation;
+  try {
+    await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
+    const data = await withTimeout(readConversationDocument(id), "Read conversation");
+    if (!data) {
+      return cached ?? null;
+    }
+
+    const conversation = normalizeConversation(data, await readMessages(id));
+    conversationCache = [
+      conversation,
+      ...conversationCache.filter((cached) => cached.id !== conversation.id),
+    ];
+    return conversation;
+  } catch (error) {
+    console.error("CloudBase conversation read failed.", error);
+    throw error;
+  }
 }
 
 export async function createOrOpenConversation(input: ConversationInput) {
-  await ensureCloudbaseLogin();
   const id = `${input.postType}-${input.postId}`;
   const existing = await getConversation(id);
 
@@ -208,56 +310,140 @@ export async function createOrOpenConversation(input: ConversationInput) {
     messages: [],
   };
 
-  await cloudbaseDb.collection(conversationsCollectionName).doc(id).set(
-    stripUndefined({
-      ...conversation,
-      messages: undefined,
-      createdAt: timestamp(),
-      updatedAt: timestamp(),
-    }),
-  );
-  conversationCache = [conversation, ...conversationCache];
+  try {
+    await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
+    await withTimeout(
+      cloudbaseDb.collection(conversationsCollectionName).doc(id).set(
+        stripUndefined({
+          ...conversation,
+          messages: undefined,
+          createdAt: timestamp(),
+          updatedAt: timestamp(),
+        }),
+      ),
+      "Create conversation",
+    );
+    conversationCache = [conversation, ...conversationCache];
+  } catch (error) {
+    console.error("CloudBase conversation create failed.", error);
+    throw error;
+  }
   return conversation;
 }
 
+function receiverIdFor(conversation: Conversation, senderId: string) {
+  const candidateIds = [conversation.postOwnerId, conversation.starterUserId].filter(Boolean) as string[];
+  return candidateIds.find((candidateId) => candidateId !== senderId) || "other-user";
+}
+
 export async function markConversationRead(id: string) {
-  await ensureCloudbaseLogin();
-  await cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
-    unread: false,
-    updatedAt: timestamp(),
-  });
+  try {
+    await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
+    await withTimeout(
+      cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
+        unread: false,
+        updatedAt: timestamp(),
+      }),
+      "Mark conversation read",
+    );
+  } catch {
+    updateLocalConversation(id, (conversation) => ({ ...conversation, unread: false }));
+  }
   conversationCache = conversationCache.map((conversation) =>
     conversation.id === id ? { ...conversation, unread: false } : conversation,
   );
 }
 
 export async function appendConversationMessage(id: string, text?: string, imageDataUrl?: string) {
-  await ensureCloudbaseLogin();
+  const conversation = await getConversation(id);
+  if (!conversation) {
+    throw new Error("Conversation not found. Please reopen the post and try again.");
+  }
+
   const createdAt = timestamp();
+  const senderId = currentOwnerId();
+  const receiverId = receiverIdFor(conversation, senderId);
+  const type = imageDataUrl ? "image" : "text";
   const message: ConversationMessage = {
     id: messageId(),
     author: "Me",
-    senderId: currentOwnerId(),
+    senderId,
+    receiverId,
     text,
+    imageUrl: imageDataUrl,
     imageDataUrl,
+    type,
     createdAt,
+    read: false,
+    readByUserIds: [senderId],
     recalled: false,
     hiddenForUserIds: [],
   };
-  await cloudbaseDb.collection(messagesCollectionName).doc(message.id || messageId()).set(
-    stripUndefined({
-      ...message,
-      conversationId: id,
-    }),
-  );
   const latestPreview = text || (imageDataUrl ? "Sent an image" : "");
-  await cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
-    latestPreview,
-    latestTime: timeLabel(createdAt),
-    unread: false,
-    updatedAt: createdAt,
-  });
-  return getConversation(id);
+
+  await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
+  await withTimeout(
+    cloudbaseDb.collection(messagesCollectionName).doc(message.id || messageId()).set(
+      stripUndefined({
+        ...message,
+        conversationId: id,
+        imageDataUrl: undefined,
+      }),
+    ),
+    "Send message",
+  );
+  await withTimeout(
+    cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
+      latestPreview,
+      latestTime: timeLabel(createdAt),
+      unread: true,
+      unreadForUserIds: [receiverId],
+      updatedAt: createdAt,
+    }),
+    "Update conversation",
+  );
+
+  try {
+    return await getConversation(id);
+  } catch {
+    return {
+      ...conversation,
+      latestPreview,
+      latestTime: timeLabel(createdAt),
+      unread: true,
+      messages: [...conversation.messages, message],
+    };
+  }
+}
+
+export async function subscribeConversationMessages(
+  conversationId: string,
+  handlers: {
+    onMessages: (messages: ConversationMessage[]) => void;
+    onError: (message: string) => void;
+  },
+) {
+  await ensureCloudbaseLogin();
+
+  const listener = cloudbaseDb
+    .collection(messagesCollectionName)
+    .where({ conversationId })
+    .orderBy("createdAt", "asc")
+    .watch({
+      onChange: (snapshot: { docs?: Record<string, unknown>[] }) => {
+        const messages = (snapshot.docs || [])
+          .map(normalizeMessage)
+          .sort((first, second) => (first.createdAt || 0) - (second.createdAt || 0));
+        handlers.onMessages(messages);
+      },
+      onError: (error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error("CloudBase message listener failed.", error);
+        handlers.onError(`Message sync failed: ${message}`);
+      },
+    });
+
+  return () => listener.close();
 }
 
 export function appendConversationImageMessage(id: string, imageDataUrl: string) {

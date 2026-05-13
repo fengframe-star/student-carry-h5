@@ -9,7 +9,8 @@ import { readImageAsDataUrl } from "../lib/imageFiles";
 import { useLanguage } from "../lib/language";
 import { itemCategories, matchingCarriers } from "../lib/matching";
 import { createRequestSubmission, getSubmissions, updateSubmission } from "../lib/submissions";
-import { currentOwnerId, profileNickname } from "../lib/profile";
+import { currentOwnerId, isLoggedIn, profileNickname, readStoredProfile } from "../lib/profile";
+import { isProfileComplete } from "../lib/auth";
 import type { CarrierSubmission, ChinaDomesticShipping, ItemCategory, RequestSubmission } from "../types";
 
 const chinaDomesticShippingOptions: ChinaDomesticShipping[] = [
@@ -72,6 +73,12 @@ export default function PostRequestPage() {
   const [error, setError] = useState("");
   const [matches, setMatches] = useState<Array<{ carrier: CarrierSubmission; score: number }>>([]);
   const [showMatches, setShowMatches] = useState(false);
+
+  useEffect(() => {
+    if (!isLoggedIn() || !isProfileComplete(readStoredProfile())) {
+      navigate("/my");
+    }
+  }, [navigate]);
 
   useEffect(() => {
     if (!editId) {
@@ -239,7 +246,6 @@ export default function PostRequestPage() {
               <input
                 type="file"
                 accept="image/*"
-                capture="environment"
                 className="sr-only"
                 onChange={async (event) => {
                   const file = event.target.files?.[0];

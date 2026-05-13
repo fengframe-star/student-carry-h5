@@ -11,13 +11,14 @@ import {
   hideConversationMessageForMe,
   markConversationRead,
   recallConversationMessage,
+  subscribeConversationMessages,
   type Conversation,
   type ConversationMessage,
 } from "../lib/conversations";
 import { readImageAsDataUrl } from "../lib/imageFiles";
 import { useLanguage } from "../lib/language";
 import { isMatchedStatus, localizedStatusLabel } from "../lib/orderAccess";
-import { currentOwnerId } from "../lib/profile";
+import { currentOwnerId, isLoggedIn } from "../lib/profile";
 import { updateSubmission } from "../lib/submissions";
 
 export default function ChatDetailPage() {
@@ -27,6 +28,8 @@ export default function ChatDetailPage() {
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [pendingImage, setPendingImage] = useState("");
+  const [syncError, setSyncError] = useState("");
+  const [sendError, setSendError] = useState("");
   const [activeActionMessageId, setActiveActionMessageId] = useState<string | null>(null);
   const [pressTimer, setPressTimer] = useState<number | null>(null);
 
@@ -34,17 +37,53 @@ export default function ChatDetailPage() {
     if (!conversationId) {
       return;
     }
+    if (!isLoggedIn()) {
+      setLoading(false);
+      setConversation(null);
+      return;
+    }
 
     const id = conversationId;
+    let unsubscribe: (() => void) | undefined;
+    let cancelled = false;
+
     async function loadConversation() {
       setLoading(true);
-      await markConversationRead(id);
-      setConversation(await getConversation(id));
-      setLoading(false);
+      setSyncError("");
+      try {
+        await markConversationRead(id);
+        const nextConversation = await getConversation(id);
+        if (cancelled) {
+          return;
+        }
+
+        setConversation(nextConversation);
+        unsubscribe = await subscribeConversationMessages(id, {
+          onMessages: (messages) => {
+            setConversation((current) => current ? { ...current, messages } : current);
+          },
+          onError: setSyncError,
+        });
+      } catch (error) {
+        console.error("Chat sync setup failed.", error);
+        const message = error instanceof Error ? error.message : String(error);
+        setSyncError(t("Unable to connect to message sync. Please check CloudBase permissions.", "无法连接消息同步，请检查 CloudBase 权限。") + ` ${message}`);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
     }
 
     void loadConversation();
-  }, [conversationId]);
+
+    return () => {
+      cancelled = true;
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [conversationId, t]);
 
   async function handleSend(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,7 +94,16 @@ export default function ChatDetailPage() {
     }
 
     if (conversation) {
-      setConversation(await appendConversationMessage(conversation.id, text || undefined, pendingImage || undefined));
+      setSendError("");
+      try {
+        const nextConversation = await appendConversationMessage(conversation.id, text || undefined, pendingImage || undefined);
+        setConversation(nextConversation);
+      } catch (error) {
+        console.error("Send message failed.", error);
+        const message = error instanceof Error ? error.message : String(error);
+        setSendError(t("Message was not sent. Please try again.", "消息未发送，请重试。") + ` ${message}`);
+        return;
+      }
     }
     setDraft("");
     setPendingImage("");
@@ -63,6 +111,21 @@ export default function ChatDetailPage() {
 
   if (loading) {
     return null;
+  }
+
+  if (!isLoggedIn()) {
+    return <Navigate to="/my" replace />;
+  }
+
+  if (!conversation && syncError) {
+    return (
+      <section className="mx-auto flex min-h-[calc(100vh-132px)] max-w-3xl flex-col px-4 py-4 sm:px-6 sm:py-6">
+        <BackButton fallback="/messages" />
+        <div className="mt-4 rounded-[22px] border border-red-300/25 bg-red-500/10 p-4 text-sm font-semibold leading-6 text-red-100">
+          {syncError}
+        </div>
+      </section>
+    );
   }
 
   if (!conversation) {
@@ -173,13 +236,18 @@ export default function ChatDetailPage() {
             {t("Cancel Match", "取消匹配")}
           </button>
         ) : null}
+        {syncError ? (
+          <p className="mt-2 rounded-xl border border-red-300/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-100">
+            {syncError}
+          </p>
+        ) : null}
       </div>
 
       <div className="flex-1 space-y-3 pb-36 pt-4">
         {conversation.messages
           .filter((message) => !message.hiddenForUserIds?.includes(sideId))
           .map((message) => {
-          const isMe = message.senderId === sideId || message.senderId === currentUserId || message.author === "Me";
+          const isMe = message.senderId === sideId || message.senderId === currentUserId;
           if (message.recalled) {
             return (
               <p key={message.id} className="text-center text-xs font-semibold text-slate-500">
@@ -275,6 +343,11 @@ export default function ChatDetailPage() {
             </button>
           </div>
         ) : null}
+        {sendError ? (
+          <p className="mb-2 rounded-xl border border-red-300/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-100">
+            {sendError}
+          </p>
+        ) : null}
         <div className="flex gap-2">
           <input
             value={draft}
@@ -287,7 +360,6 @@ export default function ChatDetailPage() {
             <input
               type="file"
               accept="image/*"
-              capture="environment"
               className="sr-only"
               onChange={async (event) => {
                 const file = event.target.files?.[0];

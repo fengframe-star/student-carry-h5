@@ -74,7 +74,6 @@ function isOwner(submission: Submission) {
 }
 
 async function getPost(id: string) {
-  await ensureCloudbaseLogin();
   const result = await cloudbaseDb.collection(postsCollectionName).doc(id).get();
   const post = result.data?.[0];
   return post ? normalizeSubmission(post) : null;
@@ -90,6 +89,9 @@ export async function createRequestSubmission(data: RequestInput) {
   await cloudbaseDb.collection(postsCollectionName).add(
     stripUndefined({
       ...data,
+      ownerId: currentOwnerId(),
+      ownerNickname: profileNickname(),
+      name: profileNickname(),
       type: "request",
       status: "Open",
       publishedDate: today(),
@@ -104,6 +106,9 @@ export async function createCarrierSubmission(data: CarrierInput) {
   await cloudbaseDb.collection(postsCollectionName).add(
     stripUndefined({
       ...data,
+      ownerId: currentOwnerId(),
+      ownerNickname: profileNickname(),
+      name: profileNickname(),
       type: "carrier",
       status: "Open",
       publishedDate: today(),
@@ -114,7 +119,6 @@ export async function createCarrierSubmission(data: CarrierInput) {
 }
 
 export async function getSubmissions() {
-  await ensureCloudbaseLogin();
   const result = await cloudbaseDb
     .collection(postsCollectionName)
     .orderBy("createdAt", "desc")

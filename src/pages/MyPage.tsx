@@ -1,12 +1,11 @@
 import { FormEvent, useEffect, useState } from "react";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import { Link, useNavigate } from "react-router-dom";
-import { Apple, Circle, Mail, MessageCircle, WalletCards } from "lucide-react";
-import { auth, googleProvider } from "../lib/firebase";
+import { Mail, Phone } from "lucide-react";
+import { sendLoginCode, signOut as cloudSignOut, isProfileComplete, saveProfile, verifyLoginCode, type LoginMethod, type PendingOtpLogin } from "../lib/auth";
 import { getConversations } from "../lib/conversations";
 import { useLanguage } from "../lib/language";
 import { isCurrentUserPostOwner, isMatchedStatus, isOpenStatus, localizedStatusLabel } from "../lib/orderAccess";
-import { currentOwnerId, ownerIdForProfile } from "../lib/profile";
+import { currentOwnerId } from "../lib/profile";
 import { deleteSubmission, getSubmissions } from "../lib/submissions";
 import type { Submission } from "../types";
 
@@ -28,13 +27,17 @@ interface Profile {
 export default function MyPage() {
   const { t } = useLanguage();
   const [profile, setProfile] = useState<Profile | null>(() => readProfile());
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [nickname, setNickname] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [verificationChoice, setVerificationChoice] = useState("No");
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
+  const [account, setAccount] = useState("");
+  const [code, setCode] = useState("");
+  const [pendingLogin, setPendingLogin] = useState<PendingOtpLogin | null>(null);
+  const [profileForm, setProfileForm] = useState({
+    nickname: profile?.nickname || "",
+    currentCity: profile?.currentCity || "",
+    schoolOrUniversity: profile?.schoolOrUniversity || "",
+  });
   const [loginError, setLoginError] = useState("");
+  const [authState, setAuthState] = useState<"idle" | "sending" | "verifying" | "saving">("idle");
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [conversations, setConversations] = useState<Awaited<ReturnType<typeof getConversations>>>([]);
 
@@ -50,90 +53,72 @@ export default function MyPage() {
     }
   }, [profile]);
 
-  function saveProfile(nextProfile: Profile) {
-    const profileWithOwnerId = {
-      ...nextProfile,
-      ownerId: ownerIdForProfile(nextProfile),
-    };
-    window.localStorage.setItem("studentCarryLoggedIn", "true");
-    window.localStorage.setItem("studentCarryProfile", JSON.stringify(profileWithOwnerId));
-    setProfile(profileWithOwnerId);
-  }
-
-  function profileFromLogin(provider: string, loginEmail: string, fallbackNickname: string): Profile {
-    return {
-      nickname: nickname.trim() || fallbackNickname,
-      email: loginEmail,
-      phoneNumber: phoneNumber.trim(),
-      provider,
-      verificationLater: verificationChoice,
-      identityVerified: verificationChoice === "Yes",
-    };
-  }
-
-  function logout() {
-    window.localStorage.removeItem("studentCarryLoggedIn");
-    window.localStorage.removeItem("studentCarryProfile");
+  async function logout() {
+    await cloudSignOut();
     setProfile(null);
     setSubmissions([]);
-    setShowPasswordForm(false);
+    setConversations([]);
+    setPendingLogin(null);
+    setCode("");
   }
 
-  async function handleEmailLogin(event: FormEvent) {
+  async function handleSendCode(event: FormEvent) {
     event.preventDefault();
     setLoginError("");
+    setAuthState("sending");
 
     try {
-      if (!email.includes("@")) {
-        saveProfile({
-          ...profileFromLogin("Phone demo", `${email}@phone.local`, email || "Student Carry User"),
-          phoneNumber: email,
-        });
-        return;
-      }
-
-      if (auth) {
-        let credential;
-        try {
-          credential = await signInWithEmailAndPassword(auth, email, password);
-        } catch {
-          credential = await createUserWithEmailAndPassword(auth, email, password);
-        }
-        saveProfile({
-          ...profileFromLogin("Email", credential.user.email || email, credential.user.displayName || "Student Carry User"),
-        });
-      } else {
-        saveProfile({
-          ...profileFromLogin("Email demo", email, "Student Carry User"),
-        });
-      }
+      setPendingLogin(await sendLoginCode(loginMethod, account));
     } catch (error) {
-      setLoginError(error instanceof Error ? error.message : "Unable to log in.");
+      setLoginError(error instanceof Error ? error.message : "Unable to send verification code.");
+    } finally {
+      setAuthState("idle");
     }
   }
 
-  async function handleGmailLogin() {
+  async function handleVerifyCode(event: FormEvent) {
+    event.preventDefault();
+    if (!pendingLogin) return;
+
     setLoginError("");
+    setAuthState("verifying");
 
     try {
-      if (!auth) {
-        saveProfile({
-          ...profileFromLogin("Gmail demo", "gmail-user@example.com", "Gmail User"),
-        });
-        return;
-      }
-
-      const credential = await signInWithPopup(auth, googleProvider);
-      saveProfile({
-        ...profileFromLogin("Gmail", credential.user.email || "", credential.user.displayName || "Gmail User"),
+      const nextProfile = await verifyLoginCode(pendingLogin, code);
+      setProfile(nextProfile);
+      setProfileForm({
+        nickname: nextProfile.nickname || "",
+        currentCity: nextProfile.currentCity || "",
+        schoolOrUniversity: nextProfile.schoolOrUniversity || "",
       });
     } catch (error) {
-      setLoginError(error instanceof Error ? error.message : "Unable to log in with Gmail.");
+      setLoginError(error instanceof Error ? error.message : "Unable to verify code.");
+    } finally {
+      setAuthState("idle");
     }
   }
 
-  function handleMockLogin(provider: string) {
-    saveProfile(profileFromLogin(`${provider} demo`, `${provider.toLowerCase()}-user@example.com`, `${provider} User`));
+  async function handleCompleteProfile(event: FormEvent) {
+    event.preventDefault();
+    if (!profile) return;
+
+    setLoginError("");
+    setAuthState("saving");
+    try {
+      const nextProfile = {
+        ...profile,
+        nickname: profileForm.nickname.trim(),
+        currentCity: profileForm.currentCity.trim(),
+        schoolOrUniversity: profileForm.schoolOrUniversity.trim(),
+        studentVerification: Boolean(profileForm.schoolOrUniversity.trim()),
+      };
+      await saveProfile(nextProfile);
+      setProfile(nextProfile);
+    } catch (error) {
+      setLoginError(error instanceof Error ? error.message : "Unable to save profile.");
+    } finally {
+      setAuthState("idle");
+    }
   }
 
   const ownerId = currentOwnerId();
@@ -172,62 +157,93 @@ export default function MyPage() {
             <p className="text-xs font-bold uppercase tracking-wide text-slate-500">{t("My account", "我的")}</p>
             <h2 className="mt-1 text-lg font-black text-white">{t("Sign in to continue", "登录后继续")}</h2>
             <p className="mt-1 text-xs leading-5 text-slate-400">
-              {t("Use a social account or continue with phone or email.", "使用社交账号，或通过手机号/邮箱继续。")}
+              {t("Use email code or Mainland China SMS code. New accounts are created automatically.", "使用邮箱验证码或中国大陆手机号短信验证码。新账号会自动创建。")}
             </p>
 
-            <div className="stagger-in mt-3 grid gap-2">
-              <OAuthButton icon={Apple} label={t("Continue with Apple", "使用 Apple 继续")} onClick={() => handleMockLogin("Apple")} />
-              <OAuthButton icon={Circle} label={t("Continue with Google", "使用 Google 继续")} onClick={() => void handleGmailLogin()} />
-              <OAuthButton icon={MessageCircle} label={t("Continue with WeChat", "使用微信继续")} onClick={() => handleMockLogin("WeChat")} />
-              <OAuthButton icon={WalletCards} label={t("Continue with Alipay", "使用支付宝继续")} onClick={() => handleMockLogin("Alipay")} />
+            <div className="mt-3 grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => setShowPasswordForm((open) => !open)}
-                className="pressable flex min-h-10 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 text-xs font-black text-white"
+                onClick={() => {
+                  setLoginMethod("email");
+                  setPendingLogin(null);
+                }}
+                className={`pressable flex min-h-10 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-black ${
+                  loginMethod === "email" ? "border-sky-300/40 bg-sky-400/20 text-sky-50" : "border-white/15 bg-white/10 text-white"
+                }`}
               >
                 <Mail size={18} />
-                {t("Use phone or email", "使用手机号或邮箱")}
+                {t("Email", "邮箱")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMethod("phone");
+                  setPendingLogin(null);
+                }}
+                className={`pressable flex min-h-10 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-black ${
+                  loginMethod === "phone" ? "border-sky-300/40 bg-sky-400/20 text-sky-50" : "border-white/15 bg-white/10 text-white"
+                }`}
+              >
+                <Phone size={18} />
+                {t("Phone +86", "手机号 +86")}
               </button>
             </div>
 
-            {showPasswordForm ? (
-              <form onSubmit={handleEmailLogin} className="slide-down-panel mt-3 grid gap-3 rounded-[18px] border border-white/10 bg-white/[0.04] p-3">
+            {!pendingLogin ? (
+              <form onSubmit={handleSendCode} className="slide-down-panel mt-3 grid gap-3 rounded-[18px] border border-white/10 bg-white/[0.04] p-3">
                 <label className="block">
-                  <span className="text-xs font-semibold text-slate-100">{t("Phone or email", "手机号或邮箱")}</span>
+                  <span className="text-xs font-semibold text-slate-100">
+                    {loginMethod === "email" ? t("Email address", "邮箱地址") : t("Mainland China phone number", "中国大陆手机号")}
+                  </span>
                   <input
-                    type="text"
+                    type={loginMethod === "email" ? "email" : "tel"}
                     required
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-xs font-semibold text-slate-100">{t("Password", "密码")}</span>
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    value={password}
-                    onChange={(event) => setPassword(event.target.value)}
+                    value={account}
+                    placeholder={loginMethod === "email" ? "name@example.com" : "13800138000"}
+                    onChange={(event) => setAccount(event.target.value)}
                     className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]"
                   />
                 </label>
                 <button
                   type="submit"
-                  className="pressable min-h-10 rounded-xl bg-[#38bdf8] px-3 text-xs font-black text-white"
+                  disabled={authState === "sending"}
+                  className="pressable min-h-10 rounded-xl bg-[#38bdf8] px-3 text-xs font-black text-white disabled:opacity-60"
                 >
-                  {t("Continue", "继续")}
+                  {authState === "sending" ? t("Sending...", "发送中...") : t("Send verification code", "发送验证码")}
                 </button>
               </form>
-            ) : null}
-
-            <p className="mt-3 text-center text-xs text-slate-400">
-              {t("Don't have an account?", "还没有账号？")}{" "}
-              <Link to="/register" className="font-black text-sky-200">
-                {t("Sign up", "注册")}
-              </Link>
-            </p>
+            ) : (
+              <form onSubmit={handleVerifyCode} className="slide-down-panel mt-3 grid gap-3 rounded-[18px] border border-white/10 bg-white/[0.04] p-3">
+                <label className="block">
+                  <span className="text-xs font-semibold text-slate-100">{t("Verification code", "验证码")}</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    value={code}
+                    onChange={(event) => setCode(event.target.value)}
+                    className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={authState === "verifying"}
+                  className="pressable min-h-10 rounded-xl bg-[#38bdf8] px-3 text-xs font-black text-white disabled:opacity-60"
+                >
+                  {authState === "verifying" ? t("Verifying...", "验证中...") : t("Log in / create account", "登录 / 自动注册")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPendingLogin(null);
+                    setCode("");
+                  }}
+                  className="text-xs font-black text-sky-200"
+                >
+                  {t("Use another account", "使用其他账号")}
+                </button>
+              </form>
+            )}
           </div>
 
           {loginError && (
@@ -236,13 +252,43 @@ export default function MyPage() {
             </div>
           )}
         </>
+      ) : !isProfileComplete(profile) ? (
+        <form onSubmit={handleCompleteProfile} className="mt-4 grid gap-3 rounded-[24px] border border-white/10 bg-[#1f2232]/90 p-3.5 shadow-xl">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Profile</p>
+            <h2 className="mt-1 text-lg font-black text-white">{t("Complete your profile", "完善个人资料")}</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-400">
+              {t("Your email or phone is private and will not be shown publicly.", "你的邮箱或手机号不会公开展示。")}
+            </p>
+          </div>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-100">{t("Nickname", "昵称")}</span>
+            <input required value={profileForm.nickname} onChange={(event) => setProfileForm({ ...profileForm, nickname: event.target.value })} className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]" />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-100">{t("City", "城市")}</span>
+            <input required value={profileForm.currentCity} onChange={(event) => setProfileForm({ ...profileForm, currentCity: event.target.value })} className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]" />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold text-slate-100">{t("School or university (optional)", "学校或大学（选填）")}</span>
+            <input value={profileForm.schoolOrUniversity} onChange={(event) => setProfileForm({ ...profileForm, schoolOrUniversity: event.target.value })} className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]" />
+          </label>
+          <button type="submit" disabled={authState === "saving"} className="pressable min-h-10 rounded-xl bg-[#38bdf8] px-3 text-xs font-black text-white disabled:opacity-60">
+            {authState === "saving" ? t("Saving...", "保存中...") : t("Save profile", "保存资料")}
+          </button>
+          {loginError ? (
+            <div className="rounded-[18px] border border-red-400/25 bg-red-400/10 p-3 text-xs leading-5 text-red-50">
+              {loginError}
+            </div>
+          ) : null}
+        </form>
       ) : (
         <>
           <div className="mt-4 rounded-[24px] border border-white/10 bg-[#1f2232]/90 p-3.5 shadow-xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-base font-black text-white">{profile.nickname}</p>
-                <p className="mt-0.5 text-xs text-slate-400">{profile.email || t("No email connected", "未绑定邮箱")}</p>
+                <p className="mt-0.5 text-xs text-slate-400">{profile.currentCity || t("City pending", "城市待完善")}</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <p className="inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-slate-300">
                     {profile.provider}
@@ -329,28 +375,6 @@ function postCardProps(
     detailTo: `/market/carry/${item.id}`,
     editTo: `/carry-earn?edit=${item.id}`,
   };
-}
-
-function OAuthButton({
-  icon: Icon,
-  label,
-  onClick,
-}: {
-  icon: typeof Apple;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="pressable grid min-h-10 grid-cols-[1fr_auto_1fr] items-center rounded-xl border border-white/15 bg-white/10 px-3 text-xs font-black text-white"
-    >
-      <Icon size={16} className="mr-3 self-center justify-self-end" />
-      <span className="self-center justify-self-center leading-none">{label}</span>
-      <span />
-    </button>
-  );
 }
 
 function OwnPostCard({

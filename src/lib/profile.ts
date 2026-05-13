@@ -54,16 +54,9 @@ export function currentOwnerId() {
     return ownerIdForProfile(profile);
   }
 
-  if (typeof window === "undefined") {
-    return "anonymous";
-  }
+  return "";
+}
 
-  const existing = window.localStorage.getItem(anonymousOwnerKey);
-  if (existing) {
-    return existing;
-  }
-
-  const next = makeOwnerId("anonymous");
-  window.localStorage.setItem(anonymousOwnerKey, next);
-  return next;
+export function isLoggedIn() {
+  return Boolean(readStoredProfile()?.ownerId);
 }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, NavLink } from "react-router-dom";
-import { Globe2, MessageCircle, Moon, PackageCheck, Sun } from "lucide-react";
+import { Globe2, Moon, Sun } from "lucide-react";
+import logoUrl from "../assets/student-carry-logo.png";
 import { useLanguage } from "../lib/language";
 import { useTheme } from "../lib/theme";
 
@@ -24,18 +25,18 @@ export default function Header() {
     setLanguageClosing(true);
     window.setTimeout(() => {
       setLanguageOpen(false);
-    }, 180);
+    }, 220);
     window.setTimeout(() => {
       setLanguageClosing(false);
-    }, 360);
+    }, 440);
   }
 
   return (
     <header className="app-header sticky top-0 z-20 border-b border-white/10 bg-[#050918]/85 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         <Link to="/" className="flex items-center gap-2 font-semibold text-white">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#38bdf8] text-white shadow-sm">
-            <PackageCheck size={20} aria-hidden="true" />
+          <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl shadow-sm">
+            <img src={logoUrl} alt="" className="app-logo-image h-full w-full object-cover" aria-hidden="true" />
           </span>
           <span>Student Carry</span>
         </Link>
@@ -84,13 +85,6 @@ export default function Header() {
         >
           {theme === "dark" ? <Sun size={18} aria-hidden="true" /> : <Moon size={18} aria-hidden="true" />}
         </button>
-        <Link
-          to="/messages"
-          className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-slate-300 sm:hidden"
-          aria-label="Message"
-        >
-          <MessageCircle size={19} aria-hidden="true" />
-        </Link>
         <nav className="hidden flex-wrap items-center justify-end gap-1 text-sm sm:flex">
           {navItems.map((item) => (
             <NavLink

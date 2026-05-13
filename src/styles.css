@@ -104,6 +104,10 @@ a {
   border-color: var(--app-border);
 }
 
+.app-logo-image {
+  filter: hue-rotate(-4deg) saturate(0.95) brightness(1.035);
+}
+
 .theme-light footer {
   background: var(--app-footer-bg);
   border-color: var(--app-border);
@@ -137,7 +141,7 @@ a {
 
 .language-picker {
   isolation: isolate;
-  transition: width 180ms ease-out;
+  transition: width 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .language-picker:has(.language-options) {
@@ -153,7 +157,7 @@ a {
   opacity: 0;
   content: "";
   pointer-events: none;
-  transition: opacity 160ms ease-out;
+  transition: opacity 180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .language-picker:has(.language-options)::before {
@@ -167,10 +171,10 @@ a {
     0 10px 24px rgb(0 0 0 / 0.22),
     0 0 0 1px rgb(255 255 255 / 0.02) inset;
   transition:
-    transform 180ms ease-out,
-    background-color 180ms ease,
-    border-color 180ms ease,
-    box-shadow 180ms ease;
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease;
   will-change: transform;
 }
 
@@ -191,11 +195,11 @@ a {
 }
 
 .language-options-open {
-  animation: language-options-open 180ms ease-out both;
+  animation: language-options-open 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .language-options-close {
-  animation: language-options-close 180ms ease-out both;
+  animation: language-options-close 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .stagger-in > * {
@@ -271,8 +275,7 @@ a {
 }
 
 .theme-light .language-globe,
-.theme-light .theme-toggle,
-.theme-light header a[aria-label="Message"] {
+.theme-light .theme-toggle {
   background: rgb(255 255 255 / 0.72);
   border-color: var(--app-border);
   color: #334155;
@@ -355,10 +358,10 @@ a {
 }
 
 .theme-light nav.fixed svg {
-  color: #2563eb;
+  color: #0ea5e9;
   filter:
-    drop-shadow(0 0 4px rgb(59 130 246 / 0.42))
-    drop-shadow(0 2px 5px rgb(37 99 235 / 0.14));
+    drop-shadow(0 0 5px rgb(56 189 248 / 0.46))
+    drop-shadow(0 2px 6px rgb(14 165 233 / 0.18));
 }
 
 .theme-light nav.fixed a {
@@ -366,10 +369,10 @@ a {
 }
 
 .theme-light nav.fixed a[aria-current="page"] svg {
-  color: #1d4ed8;
+  color: #0284c7;
   filter:
-    drop-shadow(0 0 6px rgb(59 130 246 / 0.5))
-    drop-shadow(0 2px 7px rgb(37 99 235 / 0.18));
+    drop-shadow(0 0 7px rgb(56 189 248 / 0.56))
+    drop-shadow(0 2px 8px rgb(14 165 233 / 0.22));
 }
 
 .theme-light [class*="bg-[#38bdf8]"] {

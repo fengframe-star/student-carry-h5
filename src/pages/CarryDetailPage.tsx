@@ -15,6 +15,8 @@ import {
 } from "../lib/orderAccess";
 import { deleteSubmission, getSubmissions, updateSubmission } from "../lib/submissions";
 import { useLanguage } from "../lib/language";
+import { isLoggedIn, readStoredProfile } from "../lib/profile";
+import { isProfileComplete } from "../lib/auth";
 import type { CarrierSubmission } from "../types";
 
 export default function CarryDetailPage() {
@@ -27,7 +29,10 @@ export default function CarryDetailPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const [submissions] = await Promise.all([getSubmissions(), getConversations()]);
+      const submissions = await getSubmissions();
+      if (isLoggedIn()) {
+        await getConversations().catch((error) => console.warn("Unable to warm conversation cache.", error));
+      }
       const matched = submissions.find(
         (submission): submission is CarrierSubmission =>
           submission.type === "carrier" && submission.id === id,
@@ -170,18 +175,27 @@ export default function CarryDetailPage() {
           if (!carry) {
             return;
           }
+          if (!isLoggedIn() || !isProfileComplete(readStoredProfile())) {
+            navigate("/my");
+            return;
+          }
 
-          const conversation = await createOrOpenConversation({
-            postType: "carry",
-            postId: carry.id,
-            postOwnerId: carry.ownerId || carry.ownerNickname || carry.name,
-            otherUserName: carry.ownerNickname || carry.name || t("User", "用户"),
-            item: carry.availableLuggageSpace || t("Carry space", "可用空间"),
-            route: carry.travelRoute ? routeLabel(carry.travelRoute, language) : t("Route pending", "路线待定"),
-            reward: carry.expectedReward || t("Reward pending", "报酬待定"),
-            status: carry.status || "Open",
-          });
-          navigate(`/messages/${conversation.id}`);
+          try {
+            const conversation = await createOrOpenConversation({
+              postType: "carry",
+              postId: carry.id,
+              postOwnerId: carry.ownerId || carry.ownerNickname || carry.name,
+              otherUserName: carry.ownerNickname || carry.name || t("User", "用户"),
+              item: carry.availableLuggageSpace || t("Carry space", "可用空间"),
+              route: carry.travelRoute ? routeLabel(carry.travelRoute, language) : t("Route pending", "路线待定"),
+              reward: carry.expectedReward || t("Reward pending", "报酬待定"),
+              status: carry.status || "Open",
+            });
+            navigate(`/messages/${conversation.id}`);
+          } catch (error) {
+            console.error("Create conversation failed.", error);
+            window.alert(t("Unable to start chat. Please check CloudBase permissions and try again.", "无法开始沟通，请检查 CloudBase 权限后重试。"));
+          }
         }}
       />
     </section>

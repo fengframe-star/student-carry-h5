@@ -7,7 +7,8 @@ import { citiesFor, cityLabel, countries, countryLabel, routeFromParts, type Cou
 import { useLanguage } from "../lib/language";
 import { itemCategories, matchingRequests } from "../lib/matching";
 import { createCarrierSubmission, getSubmissions, updateSubmission } from "../lib/submissions";
-import { currentOwnerId, profileNickname } from "../lib/profile";
+import { currentOwnerId, isLoggedIn, profileNickname, readStoredProfile } from "../lib/profile";
+import { isProfileComplete } from "../lib/auth";
 import type { CarrierSubmission, ItemCategory, RequestSubmission } from "../types";
 
 const initialForm = {
@@ -56,6 +57,12 @@ export default function CarryEarnPage() {
   const [error, setError] = useState("");
   const [matches, setMatches] = useState<Array<{ request: RequestSubmission; score: number }>>([]);
   const [showMatches, setShowMatches] = useState(false);
+
+  useEffect(() => {
+    if (!isLoggedIn() || !isProfileComplete(readStoredProfile())) {
+      navigate("/my");
+    }
+  }, [navigate]);
 
   useEffect(() => {
     if (!editId) {

@@ -15,6 +15,8 @@ import {
 } from "../lib/orderAccess";
 import { deleteSubmission, getSubmissions, updateSubmission } from "../lib/submissions";
 import { useLanguage } from "../lib/language";
+import { isLoggedIn, readStoredProfile } from "../lib/profile";
+import { isProfileComplete } from "../lib/auth";
 import type { RequestSubmission } from "../types";
 
 export default function RequestDetailPage() {
@@ -27,7 +29,10 @@ export default function RequestDetailPage() {
   useEffect(() => {
     async function load() {
       setLoading(true);
-      const [submissions] = await Promise.all([getSubmissions(), getConversations()]);
+      const submissions = await getSubmissions();
+      if (isLoggedIn()) {
+        await getConversations().catch((error) => console.warn("Unable to warm conversation cache.", error));
+      }
       const matched = submissions.find(
         (submission): submission is RequestSubmission =>
           submission.type === "request" && submission.id === id,
@@ -182,18 +187,27 @@ export default function RequestDetailPage() {
           if (!request) {
             return;
           }
+          if (!isLoggedIn() || !isProfileComplete(readStoredProfile())) {
+            navigate("/my");
+            return;
+          }
 
-          const conversation = await createOrOpenConversation({
-            postType: "request",
-            postId: request.id,
-            postOwnerId: request.ownerId || request.ownerNickname || request.name,
-            otherUserName: request.ownerNickname || request.name || t("User", "用户"),
-            item: request.itemName || t("Item", "物品"),
-            route: routeText(request.fromLocation, request.toLocation, language) || t("Route pending", "路线待定"),
-            reward: `€${request.budgetEur || 0}`,
-            status: request.status || "Open",
-          });
-          navigate(`/messages/${conversation.id}`);
+          try {
+            const conversation = await createOrOpenConversation({
+              postType: "request",
+              postId: request.id,
+              postOwnerId: request.ownerId || request.ownerNickname || request.name,
+              otherUserName: request.ownerNickname || request.name || t("User", "用户"),
+              item: request.itemName || t("Item", "物品"),
+              route: routeText(request.fromLocation, request.toLocation, language) || t("Route pending", "路线待定"),
+              reward: `€${request.budgetEur || 0}`,
+              status: request.status || "Open",
+            });
+            navigate(`/messages/${conversation.id}`);
+          } catch (error) {
+            console.error("Create conversation failed.", error);
+            window.alert(t("Unable to start chat. Please check CloudBase permissions and try again.", "无法开始沟通，请检查 CloudBase 权限后重试。"));
+          }
         }}
       />
     </section>
