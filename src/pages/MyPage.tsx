@@ -112,8 +112,7 @@ export default function MyPage() {
       if (result.exists) {
         setAuthStep("password");
       } else {
-        setAuthState("sending");
-        setCreateVerificationId(await sendCreateAccountCode(loginMethod, result.account));
+        setCreateVerificationId(result.verificationId || await sendCreateAccountCode(loginMethod, result.account));
         setAuthStep("register");
       }
     } catch (error) {

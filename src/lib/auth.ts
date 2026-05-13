@@ -3,7 +3,6 @@ import type { StoredProfile } from "./profile";
 
 const profileKey = "studentCarryProfile";
 const usersCollectionName = "users";
-const probePassword = "__student_carry_account_probe_password_2026__";
 
 export type LoginMethod = "email" | "phone";
 
@@ -49,7 +48,7 @@ function normalizePhone(phone: string) {
 
 export function normalizeAuthAccount(method: LoginMethod, rawAccount: string) {
   const account = method === "phone" ? normalizePhone(rawAccount) : rawAccount.trim().toLowerCase();
-  if (method === "email" && !account.includes("@")) {
+  if (method === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(account)) {
     throw new Error("Please enter a valid email address.");
   }
   return account;
@@ -65,11 +64,6 @@ function signupPayload(method: LoginMethod, account: string, password: string, t
   return method === "email"
     ? { email: account, password, verification_code: token, verification_token: verificationToken }
     : { phone_number: account, password, verification_code: token, verification_token: verificationToken };
-}
-
-function isAccountMissing(error?: AuthErrorLike | null) {
-  const text = [error?.code, error?.message, error?.category].filter(Boolean).join(" ").toLowerCase();
-  return text.includes("not_found") || text.includes("not found") || text.includes("not exist") || text.includes("user_not");
 }
 
 function profileFromUser(user: CloudbaseUser, method: LoginMethod, account: string, existing?: Partial<StoredProfile>): StoredProfile {
@@ -119,17 +113,21 @@ async function profileForUser(user: CloudbaseUser, method: LoginMethod, account:
 
 export async function checkAccountStatus(method: LoginMethod, rawAccount: string) {
   const account = normalizeAuthAccount(method, rawAccount);
-  const result = await cloudbaseAuth.signInWithPassword(loginPayload(method, account, probePassword));
+  const result = await cloudbaseAuth.getVerification(
+    method === "email"
+      ? { email: account, target: "ANY" }
+      : { phone_number: account, target: "ANY" },
+  );
 
-  if (!result.error) {
-    const user = result.data?.user || result.data?.session?.user || await readCloudbaseUser();
-    if (user) {
-      await cloudbaseAuth.signOut();
-    }
+  if (result.is_user) {
     return { account, exists: true };
   }
 
-  return { account, exists: !isAccountMissing(result.error) };
+  if (!result.verification_id) {
+    throw new Error("Unable to check this account. Please try again.");
+  }
+
+  return { account, exists: false, verificationId: result.verification_id };
 }
 
 export async function signInWithAccountPassword(method: LoginMethod, account: string, password: string) {
