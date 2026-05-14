@@ -21,6 +21,20 @@ import { isMatchedStatus, localizedStatusLabel } from "../lib/orderAccess";
 import { currentOwnerId, isLoggedIn } from "../lib/profile";
 import { updateSubmission } from "../lib/submissions";
 
+function mergeMessages(current: ConversationMessage[], incoming: ConversationMessage[]) {
+  if (incoming.length === 0 && current.length > 0) {
+    return current;
+  }
+
+  const byId = new Map<string, ConversationMessage>();
+  [...current, ...incoming].forEach((message, index) => {
+    const id = message.id || `message-${index}`;
+    byId.set(id, { ...byId.get(id), ...message, id });
+  });
+
+  return Array.from(byId.values()).sort((first, second) => (first.createdAt || 0) - (second.createdAt || 0));
+}
+
 export default function ChatDetailPage() {
   const { conversationId } = useParams();
   const { language, t } = useLanguage();
@@ -62,8 +76,7 @@ export default function ChatDetailPage() {
           onMessages: (messages) => {
             setConversation((current) => {
               if (!current) return current;
-              if (messages.length === 0 && current.messages.length > 0) return current;
-              return { ...current, messages };
+              return { ...current, messages: mergeMessages(current.messages, messages) };
             });
             if (
               messages.some(

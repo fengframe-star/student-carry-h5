@@ -35,7 +35,7 @@ const chinaOrigins = [
 
 export default function MarketPage() {
   const { t } = useLanguage();
-  const [activeType, setActiveType] = useState<ActiveType>("request");
+  const [activeType, setActiveType] = useState<ActiveType>("all");
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -111,6 +111,13 @@ export default function MarketPage() {
         <div className="mt-3 grid grid-cols-3 gap-2">
           <button
             type="button"
+            onClick={() => setActiveType("all")}
+            className={tabButtonClass(activeType === "all")}
+          >
+            {t("All", "全部")}
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveType("request")}
             className={tabButtonClass(activeType === "request")}
           >
@@ -122,13 +129,6 @@ export default function MarketPage() {
             className={tabButtonClass(activeType === "carrier")}
           >
             {t("Traveling", "顺路送")}
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveType("all")}
-            className={tabButtonClass(activeType === "all")}
-          >
-            {t("All", "全部")}
           </button>
         </div>
       </div>

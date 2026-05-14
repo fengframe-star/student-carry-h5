@@ -321,7 +321,7 @@ function visibleConversations(conversations: Conversation[]): Conversation[] {
   const ownerId = currentOwnerId();
   return conversations.filter(
     (conversation) =>
-      (conversation.postOwnerId === ownerId || conversation.starterUserId === ownerId) &&
+      (conversation.participantIds?.includes(ownerId) || conversation.postOwnerId === ownerId || conversation.starterUserId === ownerId) &&
       !conversation.hiddenForUserIds?.includes(ownerId) &&
       !conversation.hiddenForUserIds?.includes(currentUserId),
   );

@@ -21,6 +21,8 @@ import { currentOwnerId } from "../lib/profile";
 import { deleteSubmission, getSubmissions } from "../lib/submissions";
 import type { Submission } from "../types";
 
+type AuthStep = "account" | "password" | "register" | "forgot";
+
 interface Profile {
   ownerId?: string;
   firstName?: string;
@@ -37,19 +39,44 @@ interface Profile {
   legalAgreementAcceptedAt?: number;
 }
 
+const authDraftKey = "studentCarryAuthDraft";
+
+function readAuthDraft() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return JSON.parse(window.sessionStorage.getItem(authDraftKey) || "null") as {
+      loginMethod?: LoginMethod;
+      authStep?: AuthStep;
+      account?: string;
+      normalizedAccount?: string;
+      code?: string;
+      password?: string;
+      confirmPassword?: string;
+      createVerificationId?: string;
+      legalAccepted?: boolean;
+    } | null;
+  } catch {
+    return null;
+  }
+}
+
 export default function MyPage() {
   const { t } = useLanguage();
   const [profile, setProfile] = useState<Profile | null>(() => readProfile());
-  const [loginMethod, setLoginMethod] = useState<LoginMethod>("email");
-  const [authStep, setAuthStep] = useState<"account" | "password" | "register" | "forgot">("account");
-  const [account, setAccount] = useState("");
-  const [normalizedAccount, setNormalizedAccount] = useState("");
-  const [code, setCode] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [createVerificationId, setCreateVerificationId] = useState("");
+  const [authDraft] = useState(() => readAuthDraft());
+  const [loginMethod, setLoginMethod] = useState<LoginMethod>(() => authDraft?.loginMethod || "email");
+  const [authStep, setAuthStep] = useState<AuthStep>(() => authDraft?.authStep || "account");
+  const [account, setAccount] = useState(() => authDraft?.account || "");
+  const [normalizedAccount, setNormalizedAccount] = useState(() => authDraft?.normalizedAccount || "");
+  const [code, setCode] = useState(() => authDraft?.code || "");
+  const [password, setPassword] = useState(() => authDraft?.password || "");
+  const [confirmPassword, setConfirmPassword] = useState(() => authDraft?.confirmPassword || "");
+  const [createVerificationId, setCreateVerificationId] = useState(() => authDraft?.createVerificationId || "");
   const [pendingReset, setPendingReset] = useState<PendingPasswordReset | null>(null);
-  const [legalAccepted, setLegalAccepted] = useState(false);
+  const [legalAccepted, setLegalAccepted] = useState(() => Boolean(authDraft?.legalAccepted));
   const [profileForm, setProfileForm] = useState({
     nickname: profile?.nickname || "",
     currentCity: profile?.currentCity || "",
@@ -72,8 +99,27 @@ export default function MyPage() {
     }
   }, [profile]);
 
+  useEffect(() => {
+    if (profile || typeof window === "undefined") {
+      return;
+    }
+
+    window.sessionStorage.setItem(authDraftKey, JSON.stringify({
+      loginMethod,
+      authStep,
+      account,
+      normalizedAccount,
+      code,
+      password,
+      confirmPassword,
+      createVerificationId,
+      legalAccepted,
+    }));
+  }, [profile, loginMethod, authStep, account, normalizedAccount, code, password, confirmPassword, createVerificationId, legalAccepted]);
+
   async function logout() {
     await cloudSignOut();
+    window.sessionStorage.removeItem(authDraftKey);
     setProfile(null);
     setSubmissions([]);
     setConversations([]);
@@ -112,7 +158,8 @@ export default function MyPage() {
       if (result.exists) {
         setAuthStep("password");
       } else {
-        setCreateVerificationId(result.verificationId || await sendCreateAccountCode(loginMethod, result.account));
+        setAuthState("sending");
+        setCreateVerificationId(await sendCreateAccountCode(loginMethod, result.account));
         setAuthStep("register");
       }
     } catch (error) {
@@ -129,6 +176,7 @@ export default function MyPage() {
 
     try {
       const nextProfile = await signInWithAccountPassword(loginMethod, normalizedAccount, password);
+      window.sessionStorage.removeItem(authDraftKey);
       setProfile(nextProfile);
       setProfileForm({
         nickname: nextProfile.nickname || "",
@@ -170,6 +218,7 @@ export default function MyPage() {
     setAuthState("verifying");
     try {
       const nextProfile = await createAccountWithPassword(loginMethod, normalizedAccount, createVerificationId, code, password, Date.now());
+      window.sessionStorage.removeItem(authDraftKey);
       setProfile(nextProfile);
       setProfileForm({
         nickname: nextProfile.nickname || "",
@@ -195,6 +244,7 @@ export default function MyPage() {
     setAuthState("verifying");
     try {
       const nextProfile = await resetPasswordAndSignIn(loginMethod, pendingReset, code, password);
+      window.sessionStorage.removeItem(authDraftKey);
       setProfile(nextProfile);
       setProfileForm({
         nickname: nextProfile.nickname || "",
@@ -234,7 +284,7 @@ export default function MyPage() {
   const ownerId = currentOwnerId();
   const matchedPostIds = new Set(
     conversations
-      .filter((conversation) => conversation.postOwnerId === ownerId || conversation.starterUserId === ownerId)
+      .filter((conversation) => conversation.participantIds?.includes(ownerId) || conversation.postOwnerId === ownerId || conversation.starterUserId === ownerId)
       .map((conversation) => conversation.postId),
   );
   const isOwnedByProfile = (submission: Submission) =>
@@ -321,7 +371,7 @@ export default function MyPage() {
                   disabled={authState === "checking" || authState === "sending"}
                   className="pressable min-h-10 rounded-xl bg-[#38bdf8] px-3 text-xs font-black text-white disabled:opacity-60"
                 >
-                  {authState === "checking" || authState === "sending" ? t("Checking...", "检查中...") : t("Continue", "继续")}
+                  {authState === "checking" || authState === "sending" ? <LoadingDots /> : t("Continue", "继续")}
                 </button>
               </form>
             ) : null}
@@ -706,6 +756,16 @@ function OwnPostCard({
     >
       {content}
     </article>
+  );
+}
+
+function LoadingDots() {
+  return (
+    <span className="loading-dots" aria-label="Loading">
+      <span />
+      <span />
+      <span />
+    </span>
   );
 }
 

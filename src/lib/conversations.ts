@@ -1,5 +1,5 @@
 import { cloudbaseDb, ensureCloudbaseLogin } from "../utils/cloudbase";
-import { currentOwnerId } from "./profile";
+import { currentOwnerId, profileNickname } from "./profile";
 
 export type ConversationMessage = {
   id?: string;
@@ -27,8 +27,13 @@ export type Conversation = {
   reward: string;
   status: string;
   postOwnerId?: string;
+  postOwnerName?: string;
   starterUserId?: string;
+  starterUserName?: string;
+  participantIds?: string[];
   matchConfirmations?: string[];
+  hasMessages?: boolean;
+  lastMessageAt?: number;
   latestPreview: string;
   latestTime: string;
   unread: boolean;
@@ -43,7 +48,6 @@ export type ConversationInput = Omit<
 
 const conversationsCollectionName = "conversations";
 const messagesCollectionName = "messages";
-const localConversationsKey = "studentCarryCloudFallbackConversations";
 const cloudTimeoutMs = 3500;
 export const currentUserId = "me";
 
@@ -55,50 +59,6 @@ function timestamp() {
 
 function messageId() {
   return `msg-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function canUseStorage() {
-  return typeof window !== "undefined";
-}
-
-function readLocalConversations() {
-  if (!canUseStorage()) {
-    return [];
-  }
-
-  try {
-    return (JSON.parse(window.localStorage.getItem(localConversationsKey) || "[]") as Conversation[]).map(
-      (conversation) => normalizeConversation(conversation as unknown as Record<string, unknown>, conversation.messages || []),
-    );
-  } catch {
-    return [];
-  }
-}
-
-function writeLocalConversations(conversations: Conversation[]) {
-  if (!canUseStorage()) {
-    return;
-  }
-
-  window.localStorage.setItem(localConversationsKey, JSON.stringify(conversations));
-  conversationCache = conversations;
-}
-
-function saveLocalConversation(conversation: Conversation) {
-  const conversations = readLocalConversations();
-  writeLocalConversations([
-    conversation,
-    ...conversations.filter((item) => item.id !== conversation.id),
-  ]);
-}
-
-function updateLocalConversation(id: string, updater: (conversation: Conversation) => Conversation) {
-  const conversations = readLocalConversations();
-  const next = conversations.map((conversation) =>
-    conversation.id === id ? updater(conversation) : conversation,
-  );
-  writeLocalConversations(next);
-  return next.find((conversation) => conversation.id === id) ?? null;
 }
 
 async function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
@@ -176,7 +136,11 @@ function normalizeMessage(message: Record<string, unknown>, index: number): Conv
 
 function normalizeConversation(data: Record<string, unknown>, messages: ConversationMessage[] = []): Conversation {
   const createdAt = typeof data.createdAt === "number" ? data.createdAt : undefined;
+  const lastMessageAt = typeof data.lastMessageAt === "number" ? data.lastMessageAt : createdAt;
   const viewerId = currentOwnerId();
+  const participantIds = Array.isArray(data.participantIds)
+    ? (data.participantIds as string[]).filter(Boolean)
+    : [data.postOwnerId, data.starterUserId].filter(Boolean) as string[];
   const unreadFromMessages = messages.some(
     (message) =>
       message.senderId !== viewerId &&
@@ -184,22 +148,35 @@ function normalizeConversation(data: Record<string, unknown>, messages: Conversa
       !message.hiddenForUserIds?.includes(viewerId) &&
       !message.readByUserIds?.includes(viewerId),
   );
+  const postOwnerId = typeof data.postOwnerId === "string" ? data.postOwnerId : undefined;
+  const starterUserId = typeof data.starterUserId === "string" ? data.starterUserId : currentOwnerId();
+  const postOwnerName = String(data.postOwnerName || data.otherUserName || "");
+  const starterUserName = String(data.starterUserName || "");
+  const otherUserName = viewerId && viewerId === postOwnerId
+    ? starterUserName || "Student Carry User"
+    : postOwnerName || String(data.otherUserName || "Student Carry User");
+
   return {
     id: String(data._id || data.id || ""),
     postType: data.postType === "carry" ? "carry" : "request",
     postId: String(data.postId || ""),
-    otherUserName: String(data.otherUserName || ""),
+    otherUserName,
     item: String(data.item || ""),
     route: String(data.route || ""),
     reward: String(data.reward || ""),
     status: data.status === "Matched" ? "Matched" : "Open",
-    postOwnerId: typeof data.postOwnerId === "string" ? data.postOwnerId : undefined,
-    starterUserId: typeof data.starterUserId === "string" ? data.starterUserId : currentOwnerId(),
+    postOwnerId,
+    postOwnerName,
+    starterUserId,
+    starterUserName,
+    participantIds,
     matchConfirmations: Array.isArray(data.matchConfirmations)
       ? (data.matchConfirmations as string[])
       : [],
+    hasMessages: Boolean(data.hasMessages || lastMessageAt || messages.length),
+    lastMessageAt,
     latestPreview: String(data.latestPreview || ""),
-    latestTime: String(data.latestTime || timeLabel(createdAt)),
+    latestTime: String(data.latestTime || timeLabel(lastMessageAt)),
     unread: unreadFromMessages,
     hiddenForUserIds: Array.isArray(data.hiddenForUserIds)
       ? (data.hiddenForUserIds as string[])
@@ -262,13 +239,18 @@ export async function getConversations() {
       "Read conversations",
     );
 
+    const viewerId = currentOwnerId();
     const conversations = await Promise.all(
       (result.data || []).map(async (data: Record<string, unknown>) =>
         normalizeConversation(data, await readMessages(String(data._id || data.id || ""))),
       ),
     );
-    conversationCache = conversations;
-    return conversations;
+    const visibleConversations = conversations
+      .filter((conversation) => conversation.hasMessages)
+      .filter((conversation) => conversation.participantIds?.includes(viewerId))
+      .sort((first, second) => (second.lastMessageAt || 0) - (first.lastMessageAt || 0));
+    conversationCache = visibleConversations;
+    return visibleConversations;
   } catch (error) {
     console.error("CloudBase conversations read failed.", error);
     throw error;
@@ -298,40 +280,61 @@ export async function getConversation(id: string) {
 }
 
 export async function createOrOpenConversation(input: ConversationInput) {
-  const id = `${input.postType}-${input.postId}`;
+  const starterId = currentOwnerId();
+  if (!starterId) {
+    throw new Error("Login required.");
+  }
+  if (!input.postOwnerId || input.postOwnerId === starterId) {
+    throw new Error("Unable to start a chat for this post.");
+  }
+
+  await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
+  const existingForUser = (await getConversations()).find(
+    (conversation) => conversation.postId === input.postId && conversation.participantIds?.includes(starterId),
+  );
+  if (existingForUser) {
+    return existingForUser;
+  }
+
+  const id = `${input.postType}-${input.postId}-${starterId}`;
   const existing = await getConversation(id);
 
   if (existing) {
     return existing;
   }
+  const now = timestamp();
+  const participantIds = Array.from(new Set([input.postOwnerId, starterId].filter(Boolean))) as string[];
 
   const conversation: Conversation = {
     ...input,
     id,
     status: input.status === "Matched" ? "Matched" : "Open",
-    starterUserId: currentOwnerId(),
+    starterUserId: starterId,
+    starterUserName: profileNickname(),
+    postOwnerName: input.otherUserName,
+    participantIds,
     matchConfirmations: [],
+    hasMessages: false,
+    lastMessageAt: undefined,
     latestPreview: "",
     latestTime: "",
-    unread: true,
+    unread: false,
     hiddenForUserIds: [],
     messages: [],
   };
 
   try {
-    await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
     await withTimeout(
       cloudbaseDb.collection(conversationsCollectionName).doc(id).set(
         stripUndefined({
           ...conversation,
           messages: undefined,
-          createdAt: timestamp(),
-          updatedAt: timestamp(),
+          createdAt: now,
+          updatedAt: now,
         }),
       ),
-      "Create conversation",
+      "Prepare conversation",
     );
-    conversationCache = [conversation, ...conversationCache];
   } catch (error) {
     console.error("CloudBase conversation create failed.", error);
     throw error;
@@ -375,8 +378,8 @@ export async function markConversationRead(id: string) {
       }),
       "Mark conversation read",
     );
-  } catch {
-    updateLocalConversation(id, (conversation) => ({ ...conversation, unread: false }));
+  } catch (error) {
+    console.error("Mark conversation read failed.", error);
   }
   conversationCache = conversationCache.map((conversation) =>
     conversation.id === id
@@ -402,9 +405,13 @@ export async function appendConversationMessage(id: string, text?: string, image
   const createdAt = timestamp();
   const senderId = currentOwnerId();
   const receiverId = receiverIdFor(conversation, senderId);
+  if (!senderId || !receiverId || receiverId === "other-user") {
+    throw new Error("Unable to identify chat participants.");
+  }
   const type = imageDataUrl ? "image" : "text";
+  const stableMessageId = messageId();
   const message: ConversationMessage = {
-    id: messageId(),
+    id: stableMessageId,
     author: "Me",
     senderId,
     receiverId,
@@ -422,9 +429,10 @@ export async function appendConversationMessage(id: string, text?: string, image
 
   await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
   await withTimeout(
-    cloudbaseDb.collection(messagesCollectionName).doc(message.id || messageId()).set(
+    cloudbaseDb.collection(messagesCollectionName).doc(stableMessageId).set(
       stripUndefined({
         ...message,
+        clientId: stableMessageId,
         conversationId: id,
         imageDataUrl: undefined,
       }),
@@ -433,8 +441,11 @@ export async function appendConversationMessage(id: string, text?: string, image
   );
   await withTimeout(
     cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
+      participantIds: Array.from(new Set([conversation.postOwnerId, conversation.starterUserId, senderId, receiverId].filter(Boolean))),
+      hasMessages: true,
       latestPreview,
       latestTime: timeLabel(createdAt),
+      lastMessageAt: createdAt,
       unread: true,
       unreadForUserIds: [receiverId],
       updatedAt: createdAt,
@@ -449,6 +460,8 @@ export async function appendConversationMessage(id: string, text?: string, image
       ...conversation,
       latestPreview,
       latestTime: timeLabel(createdAt),
+      hasMessages: true,
+      lastMessageAt: createdAt,
       unread: true,
       messages: [...conversation.messages, message],
     };
@@ -503,8 +516,13 @@ export async function subscribeConversations(
             normalizeConversation(data, await readMessages(String(data._id || data.id || ""))),
           ),
         ).then((conversations) => {
-          conversationCache = conversations;
-          handlers.onConversations(conversations);
+          const viewerId = currentOwnerId();
+          const visibleConversations = conversations
+            .filter((conversation) => conversation.hasMessages)
+            .filter((conversation) => conversation.participantIds?.includes(viewerId))
+            .sort((first, second) => (second.lastMessageAt || 0) - (first.lastMessageAt || 0));
+          conversationCache = visibleConversations;
+          handlers.onConversations(visibleConversations);
         }).catch((error: unknown) => {
           const message = error instanceof Error ? error.message : String(error);
           console.error("CloudBase conversation listener hydration failed.", error);

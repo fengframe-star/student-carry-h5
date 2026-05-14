@@ -113,21 +113,8 @@ async function profileForUser(user: CloudbaseUser, method: LoginMethod, account:
 
 export async function checkAccountStatus(method: LoginMethod, rawAccount: string) {
   const account = normalizeAuthAccount(method, rawAccount);
-  const result = await cloudbaseAuth.getVerification(
-    method === "email"
-      ? { email: account, target: "ANY" }
-      : { phone_number: account, target: "ANY" },
-  );
-
-  if (result.is_user) {
-    return { account, exists: true };
-  }
-
-  if (!result.verification_id) {
-    throw new Error("Unable to check this account. Please try again.");
-  }
-
-  return { account, exists: false, verificationId: result.verification_id };
+  const exists = await cloudbaseAuth.isUsernameRegistered(account);
+  return { account, exists };
 }
 
 export async function signInWithAccountPassword(method: LoginMethod, account: string, password: string) {

@@ -196,7 +196,7 @@ export default function RequestDetailPage() {
             const conversation = await createOrOpenConversation({
               postType: "request",
               postId: request.id,
-              postOwnerId: request.ownerId || request.ownerNickname || request.name,
+              postOwnerId: request.ownerId,
               otherUserName: request.ownerNickname || request.name || t("User", "用户"),
               item: request.itemName || t("Item", "物品"),
               route: routeText(request.fromLocation, request.toLocation, language) || t("Route pending", "路线待定"),

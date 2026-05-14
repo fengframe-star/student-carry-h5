@@ -184,7 +184,7 @@ export default function CarryDetailPage() {
             const conversation = await createOrOpenConversation({
               postType: "carry",
               postId: carry.id,
-              postOwnerId: carry.ownerId || carry.ownerNickname || carry.name,
+              postOwnerId: carry.ownerId,
               otherUserName: carry.ownerNickname || carry.name || t("User", "用户"),
               item: carry.availableLuggageSpace || t("Carry space", "可用空间"),
               route: carry.travelRoute ? routeLabel(carry.travelRoute, language) : t("Route pending", "路线待定"),
