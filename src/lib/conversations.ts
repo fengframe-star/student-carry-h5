@@ -263,7 +263,7 @@ export function getCachedConversations() {
 
 export async function getConversations() {
   try {
-    await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
+    const viewerId = await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
     const result = await withTimeout(
       cloudbaseDb
         .collection(conversationsCollectionName)
@@ -272,7 +272,6 @@ export async function getConversations() {
       "Read conversations",
     );
 
-    const viewerId = currentOwnerId();
     const conversations = await Promise.all(
       (result.data || []).map(async (data: Record<string, unknown>) =>
         normalizeConversation(data, await readMessages(String(data._id || data.id || ""))),
@@ -313,7 +312,7 @@ export async function getConversation(id: string) {
 }
 
 export async function createOrOpenConversation(input: ConversationInput) {
-  const starterId = currentOwnerId();
+  const starterId = await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
   if (!starterId) {
     throw new Error("Login required.");
   }
@@ -321,7 +320,6 @@ export async function createOrOpenConversation(input: ConversationInput) {
     throw new Error("Unable to start a chat for this post.");
   }
 
-  await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
   const existingForUser = (await getConversations()).find(
     (conversation) => conversation.postId === input.postId && conversation.participantIds?.includes(starterId),
   );
@@ -381,9 +379,9 @@ function receiverIdFor(conversation: Conversation, senderId: string) {
 }
 
 export async function markConversationRead(id: string) {
-  const viewerId = currentOwnerId();
+  let viewerId = "";
   try {
-    await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
+    viewerId = await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
     const messages = await readMessages(id);
     await Promise.all(
       messages
@@ -414,17 +412,20 @@ export async function markConversationRead(id: string) {
   } catch (error) {
     console.error("Mark conversation read failed.", error);
   }
+  if (!viewerId) {
+    return;
+  }
   conversationCache = conversationCache.map((conversation) =>
     conversation.id === id
       ? {
-          ...conversation,
-          unread: false,
-          messages: conversation.messages.map((message) =>
-            message.senderId !== viewerId
-              ? { ...message, read: true, readByUserIds: Array.from(new Set([...(message.readByUserIds || []), viewerId])) }
-              : message,
-          ),
-        }
+            ...conversation,
+            unread: false,
+            messages: conversation.messages.map((message) =>
+              message.senderId !== viewerId
+                ? { ...message, read: true, readByUserIds: Array.from(new Set([...(message.readByUserIds || []), viewerId])) }
+                : message,
+            ),
+      }
       : conversation,
   );
 }
@@ -436,7 +437,7 @@ export async function appendConversationMessage(id: string, text?: string, image
   }
 
   const createdAt = timestamp();
-  const senderId = currentOwnerId();
+  const senderId = await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
   const receiverId = receiverIdFor(conversation, senderId);
   if (!senderId || !receiverId || receiverId === "other-user") {
     throw new Error("Unable to identify chat participants.");
@@ -460,7 +461,6 @@ export async function appendConversationMessage(id: string, text?: string, image
   };
   const latestPreview = text || (imageDataUrl ? "Sent an image" : "");
 
-  await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
   await withTimeout(
     cloudbaseDb.collection(messagesCollectionName).doc(stableMessageId).set(
       stripUndefined({
@@ -472,6 +472,12 @@ export async function appendConversationMessage(id: string, text?: string, image
     ),
     "Send message",
   );
+  console.info("CloudBase message written.", {
+    conversationId: id,
+    messageId: stableMessageId,
+    senderId,
+    receiverId,
+  });
   await withTimeout(
     cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
       participantIds: Array.from(new Set([conversation.postOwnerId, conversation.starterUserId, senderId, receiverId].filter(Boolean))),
@@ -485,20 +491,17 @@ export async function appendConversationMessage(id: string, text?: string, image
     }),
     "Update conversation",
   );
+  console.info("CloudBase conversation updated.", {
+    conversationId: id,
+    participantIds: Array.from(new Set([conversation.postOwnerId, conversation.starterUserId, senderId, receiverId].filter(Boolean))),
+    lastMessageAt: createdAt,
+  });
 
-  try {
-    return await getConversation(id);
-  } catch {
-    return {
-      ...conversation,
-      latestPreview,
-      latestTime: timeLabel(createdAt),
-      hasMessages: true,
-      lastMessageAt: createdAt,
-      unread: true,
-      messages: [...conversation.messages, message],
-    };
+  const confirmedConversation = await getConversation(id);
+  if (!confirmedConversation) {
+    throw new Error("Message was written, but the conversation could not be reloaded from CloudBase.");
   }
+  return confirmedConversation;
 }
 
 export async function subscribeConversationMessages(
@@ -556,7 +559,7 @@ export async function subscribeConversations(
     onError?: (message: string) => void;
   },
 ) {
-  await ensureCloudbaseLogin();
+  const viewerId = await ensureCloudbaseLogin();
 
   let fallbackClose: (() => void) | undefined;
   let listener: { close?: () => void } | undefined;
@@ -567,7 +570,6 @@ export async function subscribeConversations(
         normalizeConversation(data, await readMessages(String(data._id || data.id || ""))),
       ),
     );
-    const viewerId = currentOwnerId();
     const visibleConversations = conversations
       .filter((conversation) => conversation.hasMessages)
       .filter((conversation) => conversation.participantIds?.includes(viewerId))
@@ -618,8 +620,7 @@ export async function subscribeUnreadMessages(
     onError?: (message: string) => void;
   },
 ) {
-  await ensureCloudbaseLogin();
-  const viewerId = currentOwnerId();
+  const viewerId = await ensureCloudbaseLogin();
   if (!viewerId) {
     handlers.onUnread([]);
     return () => {};
@@ -700,13 +701,12 @@ export function appendConversationImageMessage(id: string, imageDataUrl: string)
 }
 
 export async function hideConversationMessageForMe(id: string, messageIdToHide: string) {
-  await ensureCloudbaseLogin();
+  const viewerId = await ensureCloudbaseLogin();
   const conversation = await getConversation(id);
   if (!conversation) {
     return null;
   }
 
-  const viewerId = currentOwnerId();
   const messages = conversation.messages.map((message) =>
     message.id === messageIdToHide
       ? {
@@ -732,13 +732,12 @@ export async function hideConversationMessageForMe(id: string, messageIdToHide: 
 }
 
 export async function hideConversationForMe(id: string) {
-  await ensureCloudbaseLogin();
+  const viewerId = await ensureCloudbaseLogin();
   const conversation = await getConversation(id);
   if (!conversation) {
     return conversationCache;
   }
 
-  const viewerId = currentOwnerId();
   const hiddenForUserIds = Array.from(new Set([...(conversation.hiddenForUserIds || []), viewerId]));
   await cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
     hiddenForUserIds,
@@ -779,14 +778,15 @@ export async function updateConversationStatus(id: string, status: string) {
   return getConversation(id);
 }
 
-export async function confirmConversationMatch(id: string, confirmerId = currentOwnerId()) {
-  await ensureCloudbaseLogin();
+export async function confirmConversationMatch(id: string, confirmerId?: string) {
+  const currentUid = await ensureCloudbaseLogin();
+  const confirmerUid = confirmerId || currentUid;
   const conversation = await getConversation(id);
   if (!conversation) {
     return { conversation: null, matched: false, postId: null as string | null };
   }
 
-  const confirmations = Array.from(new Set([...(conversation.matchConfirmations || []), confirmerId]));
+  const confirmations = Array.from(new Set([...(conversation.matchConfirmations || []), confirmerUid]));
   const required = [conversation.postOwnerId, conversation.starterUserId].filter(Boolean) as string[];
   const matched = required.length >= 2 && required.every((requiredId) => confirmations.includes(requiredId));
   await cloudbaseDb.collection(conversationsCollectionName).doc(id).update({

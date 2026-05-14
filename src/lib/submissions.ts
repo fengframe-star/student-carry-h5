@@ -64,13 +64,8 @@ function normalizeSubmission(data: Record<string, unknown>): Submission {
   } as Submission;
 }
 
-function isOwner(submission: Submission) {
-  const ownerId = currentOwnerId();
-  const nickname = profileNickname();
-  return Boolean(
-    (submission.ownerId && submission.ownerId === ownerId) ||
-      (!submission.ownerId && nickname && (submission.ownerNickname || submission.name) === nickname),
-  );
+function isOwner(submission: Submission, ownerId = currentOwnerId()) {
+  return Boolean(submission.ownerId && submission.ownerId === ownerId);
 }
 
 async function getPost(id: string) {
@@ -85,11 +80,11 @@ function isStatusOnlyUpdate(data: Partial<Submission>) {
 }
 
 export async function createRequestSubmission(data: RequestInput) {
-  await ensureCloudbaseLogin();
+  const ownerId = await ensureCloudbaseLogin();
   await cloudbaseDb.collection(postsCollectionName).add(
     stripUndefined({
       ...data,
-      ownerId: currentOwnerId(),
+      ownerId,
       ownerNickname: profileNickname(),
       name: profileNickname(),
       type: "request",
@@ -102,11 +97,11 @@ export async function createRequestSubmission(data: RequestInput) {
 }
 
 export async function createCarrierSubmission(data: CarrierInput) {
-  await ensureCloudbaseLogin();
+  const ownerId = await ensureCloudbaseLogin();
   await cloudbaseDb.collection(postsCollectionName).add(
     stripUndefined({
       ...data,
-      ownerId: currentOwnerId(),
+      ownerId,
       ownerNickname: profileNickname(),
       name: profileNickname(),
       type: "carrier",
@@ -140,11 +135,11 @@ export async function updateSubmissionDate(
 }
 
 export async function updateSubmission(id: string, data: Partial<Submission>) {
-  await ensureCloudbaseLogin();
+  const ownerId = await ensureCloudbaseLogin();
 
   if (!isStatusOnlyUpdate(data)) {
     const post = await getPost(id);
-    if (!post || !isOwner(post)) {
+    if (!post || !isOwner(post, ownerId)) {
       throw new Error("Only the post owner can edit this post.");
     }
   }
@@ -156,9 +151,9 @@ export async function updateSubmission(id: string, data: Partial<Submission>) {
 }
 
 export async function deleteSubmission(id: string) {
-  await ensureCloudbaseLogin();
+  const ownerId = await ensureCloudbaseLogin();
   const post = await getPost(id);
-  if (!post || !isOwner(post)) {
+  if (!post || !isOwner(post, ownerId)) {
     throw new Error("Only the post owner can delete this post.");
   }
 
@@ -166,11 +161,11 @@ export async function deleteSubmission(id: string) {
 }
 
 export async function createRegistrationSubmission(data: RegistrationInput) {
-  await ensureCloudbaseLogin();
+  const ownerId = await ensureCloudbaseLogin();
   await cloudbaseDb.collection(usersCollectionName).add(
     stripUndefined({
       ...data,
-      ownerId: currentOwnerId(),
+      ownerId,
       createdAt: timestamp(),
       updatedAt: timestamp(),
     }),

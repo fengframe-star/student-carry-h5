@@ -16,8 +16,6 @@ export type StoredProfile = {
 };
 
 const profileKey = "studentCarryProfile";
-const anonymousOwnerKey = "studentCarryAnonymousOwnerId";
-
 export function readStoredProfile(): StoredProfile | null {
   if (typeof window === "undefined") {
     return null;
@@ -36,17 +34,8 @@ export function profileNickname() {
   return profile?.nickname || profile?.name || profile?.firstName || "Student Carry User";
 }
 
-function makeOwnerId(prefix = "local") {
-  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
 export function ownerIdForProfile(profile: Pick<StoredProfile, "ownerId" | "email" | "provider" | "nickname">) {
-  if (profile.ownerId) {
-    return profile.ownerId;
-  }
-
-  const basis = [profile.provider, profile.email || profile.nickname].filter(Boolean).join(":");
-  return basis ? `profile:${basis}` : makeOwnerId("profile");
+  return profile.ownerId || "";
 }
 
 export function currentOwnerId() {

@@ -8,11 +8,27 @@ export const app = cloudbase.init({
 export const cloudbaseDb = app.database();
 export const cloudbaseAuth = app.auth({ persistence: "local" });
 
+type CloudbaseLoginUser = {
+  uid?: string;
+  id?: string;
+};
+
+function uidFromUser(user?: CloudbaseLoginUser | null) {
+  return String(user?.uid || user?.id || "");
+}
+
 export function ensureCloudbaseLogin() {
   return (async () => {
     const loginState = await cloudbaseAuth.getLoginState();
-    if (!loginState?.user) {
+    const uid = uidFromUser(loginState?.user as CloudbaseLoginUser | undefined);
+    if (!loginState?.user || !uid) {
       throw new Error("Login required.");
     }
+    return uid;
   })();
+}
+
+export async function getCloudbaseUid() {
+  const loginState = await cloudbaseAuth.getLoginState();
+  return uidFromUser(loginState?.user as CloudbaseLoginUser | undefined);
 }
