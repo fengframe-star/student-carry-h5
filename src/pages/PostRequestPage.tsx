@@ -356,16 +356,15 @@ export default function PostRequestPage() {
         <section className="mt-4 rounded-[24px] border border-white/10 bg-[#1f2232]/95 p-3.5 shadow-xl">
           <h2 className="text-base font-black text-white">{t("Possible matching carry posts", "可能匹配的顺路送")}</h2>
           <div className="mt-4 grid gap-3">
-            {matches.length ? matches.map(({ carrier, score }) => (
+            {matches.length ? matches.map(({ carrier }) => (
               <Link key={carrier.id} to={`/market/carry/${carrier.id}`} className="block rounded-[18px] border border-white/10 bg-white/[0.06] p-3 transition hover:border-sky-300/30">
                 <p className="text-xs font-black text-white">{carrier.travelRoute}</p>
                 <p className="mt-1 text-xs text-slate-400">{carrier.travelDate} · {carrier.availableLuggageSpace}</p>
                 <p className="mt-1 text-xs font-black text-sky-200">{carrier.expectedReward}</p>
-                <p className="mt-2 text-xs text-slate-500">{t("Match score", "匹配分")}: {score}</p>
               </Link>
             )) : (
               <p className="rounded-[18px] border border-white/10 bg-white/[0.06] p-3 text-xs text-slate-400">
-                {t("No suitable carry match yet. You can still publish your request.", "暂无合适的顺路送匹配，你仍然可以发布需求。")}
+                {t("No suitable matches yet.", "暂无合适匹配")}
               </p>
             )}
           </div>

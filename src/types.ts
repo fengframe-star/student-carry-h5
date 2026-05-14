@@ -3,7 +3,7 @@ export const STATUSES = [
   "Matched",
 ] as const;
 
-export type SubmissionStatus = (typeof STATUSES)[number];
+export type SubmissionStatus = (typeof STATUSES)[number] | "Pending";
 
 export type ChinaDomesticShipping =
   | "Yes"

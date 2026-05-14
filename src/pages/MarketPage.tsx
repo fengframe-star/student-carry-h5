@@ -54,6 +54,7 @@ export default function MarketPage() {
   }, []);
 
   const marketSubmissions = submissions.filter((submission) => isOpenStatus(submission.status));
+  const allMarketSubmissions = submissions.filter((submission) => isOpenStatus(submission.status) || shouldKeepMatchedInMarket(submission));
   const requests = marketSubmissions.filter(
     (submission): submission is RequestSubmission =>
       submission.type === "request" && isOpenStatus(submission.status),
@@ -62,10 +63,10 @@ export default function MarketPage() {
     (submission): submission is CarrierSubmission =>
       submission.type === "carrier" && isOpenStatus(submission.status),
   );
-  const allRequests = marketSubmissions.filter(
+  const allRequests = allMarketSubmissions.filter(
     (submission): submission is RequestSubmission => submission.type === "request",
   );
-  const allCarriers = marketSubmissions.filter(
+  const allCarriers = allMarketSubmissions.filter(
     (submission): submission is CarrierSubmission => submission.type === "carrier",
   );
 
@@ -83,7 +84,7 @@ export default function MarketPage() {
       ? requests.length
       : activeType === "carrier"
         ? carriers.length
-        : marketSubmissions.length;
+        : allMarketSubmissions.length;
   const publishTo = activeType === "request" ? "/post-request" : "/carry-earn";
   const visibleAll = [
     ...allRequests.filter((item) => routeMatches(search, `${item.fromLocation} ${item.toLocation}`)),
@@ -202,6 +203,15 @@ function StatusBadge({ status }: { status?: string }) {
   );
 }
 
+function shouldKeepMatchedInMarket(submission: Submission) {
+  if (isOpenStatus(submission.status)) return true;
+  if (submission.type !== "request") return true;
+  if (!submission.desiredDeliveryDate) return true;
+  const hideAfter = new Date(submission.desiredDeliveryDate);
+  hideAfter.setDate(hideAfter.getDate() + 3);
+  return Date.now() <= hideAfter.getTime();
+}
+
 function RequestCard({ item, index }: { item: RequestSubmission; index: number }) {
   const { t } = useLanguage();
   const canOpen = canOpenSubmission(item);
@@ -223,11 +233,11 @@ function RequestCard({ item, index }: { item: RequestSubmission; index: number }
   );
 
   if (!canOpen) {
-    return <div className="market-card opacity-75">{content}</div>;
+    return <div className="market-card opacity-50">{content}</div>;
   }
 
   return (
-    <Link to={`/market/request/${item.id}`} className="market-card block">
+    <Link to={`/market/request/${item.id}`} className={`market-card block ${isOpenStatus(item.status) ? "" : "opacity-50"}`}>
       {content}
     </Link>
   );
@@ -254,11 +264,11 @@ function CarryCard({ item, index }: { item: CarrierSubmission; index: number }) 
   );
 
   if (!canOpen) {
-    return <div className="market-card opacity-75">{content}</div>;
+    return <div className="market-card opacity-50">{content}</div>;
   }
 
   return (
-    <Link to={`/market/carry/${item.id}`} className="market-card block">
+    <Link to={`/market/carry/${item.id}`} className={`market-card block ${isOpenStatus(item.status) ? "" : "opacity-50"}`}>
       {content}
     </Link>
   );

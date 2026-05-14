@@ -32,6 +32,8 @@ export type Conversation = {
   starterUserName?: string;
   participantIds?: string[];
   matchConfirmations?: string[];
+  postOwnerContact?: ContactInfo;
+  starterContact?: ContactInfo;
   hasMessages?: boolean;
   lastMessageAt?: number;
   latestPreview: string;
@@ -39,6 +41,13 @@ export type Conversation = {
   unread: boolean;
   hiddenForUserIds?: string[];
   messages: ConversationMessage[];
+};
+
+type ContactInfo = {
+  wechatId?: string;
+  phoneNumber?: string;
+  shareWechat?: boolean;
+  sharePhone?: boolean;
 };
 
 export type ConversationInput = Omit<
@@ -197,7 +206,7 @@ function normalizeConversation(data: Record<string, unknown>, messages: Conversa
     item: String(data.item || ""),
     route: String(data.route || ""),
     reward: String(data.reward || ""),
-    status: data.status === "Matched" ? "Matched" : "Open",
+    status: data.status === "Matched" ? "Matched" : data.status === "Pending" ? "Pending" : "Open",
     postOwnerId,
     postOwnerName,
     starterUserId,
@@ -206,9 +215,15 @@ function normalizeConversation(data: Record<string, unknown>, messages: Conversa
     matchConfirmations: Array.isArray(data.matchConfirmations)
       ? (data.matchConfirmations as string[])
       : [],
+    postOwnerContact: typeof data.postOwnerContact === "object" && data.postOwnerContact
+      ? data.postOwnerContact as ContactInfo
+      : undefined,
+    starterContact: typeof data.starterContact === "object" && data.starterContact
+      ? data.starterContact as ContactInfo
+      : undefined,
     hasMessages: Boolean(data.hasMessages || lastMessageAt || messages.length),
     lastMessageAt,
-    latestPreview: String(data.latestPreview || ""),
+    latestPreview: latestPreviewFor(messages, viewerId) || String(data.latestPreview || ""),
     latestTime: String(data.latestTime || timeLabel(lastMessageAt)),
     unread: unreadFromMessages,
     hiddenForUserIds: Array.isArray(data.hiddenForUserIds)
@@ -232,6 +247,23 @@ function latestPreviewFor(messages: ConversationMessage[], viewerId = currentOwn
   }
 
   return latest.text || (latest.imageDataUrl ? "Sent an image" : "");
+}
+
+async function readUserContact(ownerId?: string): Promise<ContactInfo> {
+  if (!ownerId) return {};
+  try {
+    const result = await cloudbaseDb.collection("users").doc(ownerId).get();
+    const data = result.data?.[0] as ContactInfo | undefined;
+    return {
+      wechatId: data?.wechatId || "",
+      phoneNumber: data?.phoneNumber || "",
+      shareWechat: Boolean(data?.shareWechat),
+      sharePhone: Boolean(data?.sharePhone),
+    };
+  } catch (error) {
+    console.error("CloudBase user contact read failed.", error);
+    return {};
+  }
 }
 
 async function readMessages(conversationId: string) {
@@ -335,6 +367,10 @@ export async function createOrOpenConversation(input: ConversationInput) {
   }
   const now = timestamp();
   const participantIds = Array.from(new Set([input.postOwnerId, starterId].filter(Boolean))) as string[];
+  const [postOwnerContact, starterContact] = await Promise.all([
+    readUserContact(input.postOwnerId),
+    readUserContact(starterId),
+  ]);
 
   const conversation: Conversation = {
     ...input,
@@ -345,6 +381,8 @@ export async function createOrOpenConversation(input: ConversationInput) {
     postOwnerName: input.otherUserName,
     participantIds,
     matchConfirmations: [],
+    postOwnerContact,
+    starterContact,
     hasMessages: false,
     lastMessageAt: undefined,
     latestPreview: "",
@@ -769,7 +807,7 @@ export async function recallConversationMessage(id: string, messageIdToRecall: s
 
 export async function updateConversationStatus(id: string, status: string) {
   await ensureCloudbaseLogin();
-  const nextStatus = status === "Matched" ? "Matched" : "Open";
+  const nextStatus = status === "Matched" ? "Matched" : status === "Pending" ? "Pending" : "Open";
   await cloudbaseDb.collection(conversationsCollectionName).doc(id).update(stripUndefined({
     status: nextStatus,
     matchConfirmations: nextStatus === "Open" ? [] : undefined,
@@ -789,11 +827,19 @@ export async function confirmConversationMatch(id: string, confirmerId?: string)
   const confirmations = Array.from(new Set([...(conversation.matchConfirmations || []), confirmerUid]));
   const required = [conversation.postOwnerId, conversation.starterUserId].filter(Boolean) as string[];
   const matched = required.length >= 2 && required.every((requiredId) => confirmations.includes(requiredId));
-  await cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
-    status: matched ? "Matched" : "Open",
+  const [postOwnerContact, starterContact] = matched
+    ? await Promise.all([
+        readUserContact(conversation.postOwnerId),
+        readUserContact(conversation.starterUserId),
+      ])
+    : [conversation.postOwnerContact, conversation.starterContact];
+  await cloudbaseDb.collection(conversationsCollectionName).doc(id).update(stripUndefined({
+    status: matched ? "Matched" : "Pending",
     matchConfirmations: confirmations,
+    postOwnerContact,
+    starterContact,
     updatedAt: timestamp(),
-  });
+  }));
   const updated = await getConversation(id);
   return {
     conversation: updated,

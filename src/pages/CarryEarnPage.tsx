@@ -284,16 +284,15 @@ export default function CarryEarnPage() {
         <section className="mt-4 rounded-[24px] border border-white/10 bg-[#1f2232]/95 p-3.5 shadow-xl">
           <h2 className="text-base font-black text-white">{t("Possible matching requests", "可能匹配的帮我带")}</h2>
           <div className="mt-4 grid gap-3">
-            {matches.length ? matches.map(({ request, score }) => (
+            {matches.length ? matches.map(({ request }) => (
               <Link key={request.id} to={`/market/request/${request.id}`} className="block rounded-[18px] border border-white/10 bg-white/[0.06] p-3 transition hover:border-sky-300/30">
                 <p className="text-xs font-black text-white">{request.fromLocation} → {request.toLocation}</p>
                 <p className="mt-1 text-xs text-slate-400">{request.itemName} · {request.desiredDeliveryDate}</p>
                 <p className="mt-1 text-xs font-black text-sky-200">€{request.budgetEur}</p>
-                <p className="mt-2 text-xs text-slate-500">{t("Match score", "匹配分")}: {score}</p>
               </Link>
             )) : (
               <p className="rounded-[18px] border border-white/10 bg-white/[0.06] p-3 text-xs text-slate-400">
-                {t("No suitable request match yet. You can still publish your trip.", "暂无合适的帮我带匹配，你仍然可以发布行程。")}
+                {t("No suitable matches yet.", "暂无合适匹配")}
               </p>
             )}
           </div>

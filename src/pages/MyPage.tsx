@@ -10,11 +10,13 @@ import {
   signOut as cloudSignOut,
   isProfileComplete,
   saveProfile,
+  readCloudbaseUser,
   resetPasswordAndSignIn,
   type LoginMethod,
   type PendingPasswordReset,
 } from "../lib/auth";
 import { getConversations } from "../lib/conversations";
+import { matchingCarriers, matchingRequests } from "../lib/matching";
 import { useLanguage } from "../lib/language";
 import { isCurrentUserPostOwner, isMatchedStatus, isOpenStatus, localizedStatusLabel } from "../lib/orderAccess";
 import { currentOwnerId } from "../lib/profile";
@@ -37,6 +39,9 @@ interface Profile {
   identityVerified?: boolean;
   verificationLater?: string;
   legalAgreementAcceptedAt?: number;
+  wechatId?: string;
+  shareWechat?: boolean;
+  sharePhone?: boolean;
 }
 
 const authDraftKey = "studentCarryAuthDraft";
@@ -51,6 +56,8 @@ function readAuthDraft() {
       loginMethod?: LoginMethod;
       authStep?: AuthStep;
       account?: string;
+      emailAccount?: string;
+      phoneAccount?: string;
       normalizedAccount?: string;
       code?: string;
       password?: string;
@@ -69,7 +76,8 @@ export default function MyPage() {
   const [authDraft] = useState(() => readAuthDraft());
   const [loginMethod, setLoginMethod] = useState<LoginMethod>(() => authDraft?.loginMethod || "email");
   const [authStep, setAuthStep] = useState<AuthStep>(() => authDraft?.authStep || "account");
-  const [account, setAccount] = useState(() => authDraft?.account || "");
+  const [emailAccount, setEmailAccount] = useState(() => authDraft?.emailAccount || authDraft?.account || ".com");
+  const [phoneAccount, setPhoneAccount] = useState(() => authDraft?.phoneAccount || "");
   const [normalizedAccount, setNormalizedAccount] = useState(() => authDraft?.normalizedAccount || "");
   const [code, setCode] = useState(() => authDraft?.code || "");
   const [password, setPassword] = useState(() => authDraft?.password || "");
@@ -81,11 +89,17 @@ export default function MyPage() {
     nickname: profile?.nickname || "",
     currentCity: profile?.currentCity || "",
     schoolOrUniversity: profile?.schoolOrUniversity || "",
+    wechatId: profile?.wechatId || "",
+    phoneNumber: profile?.phoneNumber || "",
+    shareWechat: Boolean(profile?.shareWechat),
+    sharePhone: Boolean(profile?.sharePhone),
   });
   const [loginError, setLoginError] = useState("");
   const [authState, setAuthState] = useState<"idle" | "checking" | "sending" | "verifying" | "saving">("idle");
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [conversations, setConversations] = useState<Awaited<ReturnType<typeof getConversations>>>([]);
+  const [expandedMatchPostId, setExpandedMatchPostId] = useState<string | null>(null);
+  const account = loginMethod === "email" ? emailAccount : phoneAccount;
 
   async function loadPosts() {
     const [nextSubmissions, nextConversations] = await Promise.all([getSubmissions(), getConversations()]);
@@ -100,6 +114,24 @@ export default function MyPage() {
   }, [profile]);
 
   useEffect(() => {
+    if (profile) return;
+    let cancelled = false;
+    void readCloudbaseUser().then((user) => {
+      const ownerId = String(user?.uid || user?.id || "");
+      if (!ownerId || cancelled) return;
+      const restored = readProfile();
+      if (restored?.ownerId === ownerId) {
+        setProfile(restored);
+      }
+    }).catch((error) => {
+      console.error("CloudBase session restore failed.", error);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [profile]);
+
+  useEffect(() => {
     if (profile || typeof window === "undefined") {
       return;
     }
@@ -108,6 +140,8 @@ export default function MyPage() {
       loginMethod,
       authStep,
       account,
+      emailAccount,
+      phoneAccount,
       normalizedAccount,
       code,
       password,
@@ -115,7 +149,7 @@ export default function MyPage() {
       createVerificationId,
       legalAccepted,
     }));
-  }, [profile, loginMethod, authStep, account, normalizedAccount, code, password, confirmPassword, createVerificationId, legalAccepted]);
+  }, [profile, loginMethod, authStep, account, emailAccount, phoneAccount, normalizedAccount, code, password, confirmPassword, createVerificationId, legalAccepted]);
 
   async function logout() {
     await cloudSignOut();
@@ -178,16 +212,24 @@ export default function MyPage() {
       const nextProfile = await signInWithAccountPassword(loginMethod, normalizedAccount, password);
       window.sessionStorage.removeItem(authDraftKey);
       setProfile(nextProfile);
-      setProfileForm({
-        nickname: nextProfile.nickname || "",
-        currentCity: nextProfile.currentCity || "",
-        schoolOrUniversity: nextProfile.schoolOrUniversity || "",
-      });
+      setProfileForm(profileFormFrom(nextProfile));
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : "Unable to log in.");
     } finally {
       setAuthState("idle");
     }
+  }
+
+  function profileFormFrom(nextProfile: Profile) {
+    return {
+      nickname: nextProfile.nickname || "",
+      currentCity: nextProfile.currentCity || "",
+      schoolOrUniversity: nextProfile.schoolOrUniversity || "",
+      wechatId: nextProfile.wechatId || "",
+      phoneNumber: nextProfile.phoneNumber || "",
+      shareWechat: Boolean(nextProfile.shareWechat),
+      sharePhone: Boolean(nextProfile.sharePhone),
+    };
   }
 
   async function handleStartForgotPassword() {
@@ -220,11 +262,7 @@ export default function MyPage() {
       const nextProfile = await createAccountWithPassword(loginMethod, normalizedAccount, createVerificationId, code, password, Date.now());
       window.sessionStorage.removeItem(authDraftKey);
       setProfile(nextProfile);
-      setProfileForm({
-        nickname: nextProfile.nickname || "",
-        currentCity: nextProfile.currentCity || "",
-        schoolOrUniversity: nextProfile.schoolOrUniversity || "",
-      });
+      setProfileForm(profileFormFrom(nextProfile));
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : "Unable to create account.");
     } finally {
@@ -246,11 +284,7 @@ export default function MyPage() {
       const nextProfile = await resetPasswordAndSignIn(loginMethod, pendingReset, code, password);
       window.sessionStorage.removeItem(authDraftKey);
       setProfile(nextProfile);
-      setProfileForm({
-        nickname: nextProfile.nickname || "",
-        currentCity: nextProfile.currentCity || "",
-        schoolOrUniversity: nextProfile.schoolOrUniversity || "",
-      });
+      setProfileForm(profileFormFrom(nextProfile));
     } catch (error) {
       setLoginError(error instanceof Error ? error.message : "Unable to reset password.");
     } finally {
@@ -263,6 +297,10 @@ export default function MyPage() {
     if (!profile) return;
 
     setLoginError("");
+    if (!profileForm.wechatId.trim() && !profileForm.phoneNumber.trim()) {
+      setLoginError(t("Please add at least WeChat ID or phone number.", "请至少填写 WeChat ID 或手机号中的一种联系方式。"));
+      return;
+    }
     setAuthState("saving");
     try {
       const nextProfile = {
@@ -270,6 +308,10 @@ export default function MyPage() {
         nickname: profileForm.nickname.trim(),
         currentCity: profileForm.currentCity.trim(),
         schoolOrUniversity: profileForm.schoolOrUniversity.trim(),
+        wechatId: profileForm.wechatId.trim(),
+        phoneNumber: profileForm.phoneNumber.trim(),
+        shareWechat: Boolean(profileForm.shareWechat && profileForm.wechatId.trim()),
+        sharePhone: Boolean(profileForm.sharePhone && profileForm.phoneNumber.trim()),
         studentVerification: Boolean(profileForm.schoolOrUniversity.trim()),
       };
       await saveProfile(nextProfile);
@@ -362,7 +404,13 @@ export default function MyPage() {
                     required
                     value={account}
                     placeholder={loginMethod === "email" ? "name@example.com" : "13800138000"}
-                    onChange={(event) => setAccount(event.target.value)}
+                    onChange={(event) => {
+                      if (loginMethod === "email") {
+                        setEmailAccount(event.target.value);
+                      } else {
+                        setPhoneAccount(event.target.value);
+                      }
+                    }}
                     className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]"
                   />
                 </label>
@@ -568,6 +616,30 @@ export default function MyPage() {
             <span className="text-xs font-semibold text-slate-100">{t("School or university (optional)", "学校或大学（选填）")}</span>
             <input value={profileForm.schoolOrUniversity} onChange={(event) => setProfileForm({ ...profileForm, schoolOrUniversity: event.target.value })} className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]" />
           </label>
+          <div className="rounded-[18px] border border-white/10 bg-white/[0.04] p-3">
+            <p className="text-xs font-black text-white">{t("Contact after match", "匹配后联系方式")}</p>
+            <p className="mt-1 text-[0.68rem] leading-4 text-slate-400">
+              {t("Contact details are shown only after both sides agree to match.", "联系方式仅会在双方同意匹配后显示。")}
+            </p>
+            <label className="mt-3 block">
+              <span className="text-xs font-semibold text-slate-100">WeChat ID</span>
+              <input value={profileForm.wechatId} onChange={(event) => setProfileForm({ ...profileForm, wechatId: event.target.value })} className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]" />
+            </label>
+            <label className="mt-3 block">
+              <span className="text-xs font-semibold text-slate-100">{t("Phone number", "手机号")}</span>
+              <input value={profileForm.phoneNumber} onChange={(event) => setProfileForm({ ...profileForm, phoneNumber: event.target.value })} className="mt-1.5 w-full rounded-xl border border-white/15 bg-white/10 px-3 py-2.5 text-base text-white outline-none focus:border-[#38bdf8]" />
+            </label>
+            <div className="mt-3 grid gap-2 text-xs font-semibold text-slate-300">
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={profileForm.shareWechat} onChange={(event) => setProfileForm({ ...profileForm, shareWechat: event.target.checked })} className="h-4 w-4 accent-[#38bdf8]" />
+                {t("Share WeChat after match", "匹配后共享 WeChat")}
+              </label>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={profileForm.sharePhone} onChange={(event) => setProfileForm({ ...profileForm, sharePhone: event.target.checked })} className="h-4 w-4 accent-[#38bdf8]" />
+                {t("Share phone number after match", "匹配后共享手机号")}
+              </label>
+            </div>
+          </div>
           <button type="submit" disabled={authState === "saving"} className="pressable min-h-10 rounded-xl bg-[#38bdf8] px-3 text-xs font-black text-white disabled:opacity-60">
             {authState === "saving" ? t("Saving...", "保存中...") : t("Save profile", "保存资料")}
           </button>
@@ -612,7 +684,7 @@ export default function MyPage() {
 
           <PostSection
             title={t("Matched", "已匹配")}
-            subtitle={t("Matched orders you posted or accepted", "你发布或接单的已匹配订单")}
+            subtitle={t("Posts you matched or published", "你匹配或发布的已匹配订单")}
             empty={t("No matched orders yet.", "还没有已匹配订单")}
           >
             {matchedPosts.map((item) => (
@@ -621,6 +693,9 @@ export default function MyPage() {
                 {...postCardProps(item, t)}
                 status={item.status}
                 owned={isOwnedByProfile(item)}
+                recentMatches={recentMatchesFor(item, submissions, t)}
+                expanded={expandedMatchPostId === item.id}
+                onToggleMatches={() => setExpandedMatchPostId((current) => current === item.id ? null : item.id)}
                 onDelete={() => void handleDeletePost(item.id)}
               />
             ))}
@@ -637,6 +712,9 @@ export default function MyPage() {
                 {...postCardProps(item, t)}
                 status={item.status}
                 owned
+                recentMatches={recentMatchesFor(item, submissions, t)}
+                expanded={expandedMatchPostId === item.id}
+                onToggleMatches={() => setExpandedMatchPostId((current) => current === item.id ? null : item.id)}
                 onDelete={() => void handleDeletePost(item.id)}
               />
             ))}
@@ -672,6 +750,22 @@ function postCardProps(
   };
 }
 
+function recentMatchesFor(item: Submission, submissions: Submission[], t: (en: string, zh: string) => string) {
+  if (item.type === "request") {
+    return matchingCarriers(item, submissions).map(({ carrier }) => ({
+      label: carrier.travelRoute,
+      meta: `${carrier.travelDate} · ${carrier.expectedReward}`,
+      to: `/market/carry/${carrier.id}`,
+    }));
+  }
+
+  return matchingRequests(item, submissions).map(({ request }) => ({
+    label: `${request.fromLocation} → ${request.toLocation}`,
+    meta: `${request.itemName || t("Item", "物品")} · €${request.budgetEur || 0}`,
+    to: `/market/request/${request.id}`,
+  }));
+}
+
 function OwnPostCard({
   kind,
   title,
@@ -681,6 +775,9 @@ function OwnPostCard({
   owned,
   detailTo,
   editTo,
+  recentMatches,
+  expanded,
+  onToggleMatches,
   onDelete,
 }: {
   kind: string;
@@ -691,6 +788,9 @@ function OwnPostCard({
   owned: boolean;
   detailTo: string;
   editTo: string;
+  recentMatches: Array<{ label: string; meta: string; to: string }>;
+  expanded: boolean;
+  onToggleMatches: () => void;
   onDelete: () => void;
 }) {
   const navigate = useNavigate();
@@ -736,8 +836,35 @@ function OwnPostCard({
           {t("You can edit again after canceling the match.", "取消匹配后可重新编辑")}
         </p>
       ) : (
-        <p className="mt-2 text-[0.68rem] font-bold text-sky-200">{t("Tap to view details", "点击查看详情")}</p>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onToggleMatches();
+          }}
+          className="mt-2 text-[0.68rem] font-bold text-sky-200"
+        >
+          {t("View recent matches", "查看最近匹配")}
+        </button>
       )}
+      {expanded ? (
+        <div className="mt-2 grid gap-1.5 rounded-xl bg-white/[0.05] p-2">
+          {recentMatches.length ? recentMatches.map((match) => (
+            <Link
+              key={match.to}
+              to={match.to}
+              onClick={(event) => event.stopPropagation()}
+              className="rounded-lg bg-white/[0.06] px-2 py-1.5 text-[0.68rem] text-slate-300"
+            >
+              <span className="block font-black text-white">{match.label}</span>
+              <span className="block truncate text-slate-400">{match.meta}</span>
+            </Link>
+          )) : (
+            <p className="text-[0.68rem] font-semibold text-slate-400">{t("No suitable matches yet.", "暂无合适匹配")}</p>
+          )}
+        </div>
+      ) : null}
     </>
   );
 

@@ -6,6 +6,9 @@ export type StoredProfile = {
   nickname: string;
   email: string;
   phoneNumber?: string;
+  wechatId?: string;
+  shareWechat?: boolean;
+  sharePhone?: boolean;
   provider: string;
   currentCity?: string;
   schoolOrUniversity?: string;

@@ -74,6 +74,9 @@ function profileFromUser(user: CloudbaseUser, method: LoginMethod, account: stri
     nickname: existing?.nickname || user.user_metadata?.nickName || user.user_metadata?.name || "",
     email: user.email || (method === "email" ? account : "") || existing?.email || "",
     phoneNumber: user.phone || (method === "phone" ? account : "") || existing?.phoneNumber || "",
+    wechatId: existing?.wechatId || "",
+    shareWechat: Boolean(existing?.shareWechat),
+    sharePhone: Boolean(existing?.sharePhone),
     provider: method === "phone" ? "Phone password" : "Email password",
     currentCity: existing?.currentCity || "",
     schoolOrUniversity: existing?.schoolOrUniversity || "",
@@ -84,7 +87,12 @@ function profileFromUser(user: CloudbaseUser, method: LoginMethod, account: stri
 }
 
 export function isProfileComplete(profile: StoredProfile | null) {
-  return Boolean(profile?.ownerId && profile.nickname?.trim() && profile.currentCity?.trim());
+  return Boolean(
+    profile?.ownerId &&
+      profile.nickname?.trim() &&
+      profile.currentCity?.trim() &&
+      (profile.wechatId?.trim() || profile.phoneNumber?.trim()),
+  );
 }
 
 export async function readCloudbaseUser() {
@@ -220,6 +228,10 @@ export async function saveProfile(profile: StoredProfile) {
     currentCity: profile.currentCity,
     schoolOrUniversity: profile.schoolOrUniversity || "",
     studentVerification: Boolean(profile.schoolOrUniversity),
+    wechatId: profile.wechatId || "",
+    phoneNumber: profile.phoneNumber || "",
+    shareWechat: Boolean(profile.shareWechat),
+    sharePhone: Boolean(profile.sharePhone),
     legalAgreementAcceptedAt: profile.legalAgreementAcceptedAt || null,
     updatedAt: Date.now(),
   });

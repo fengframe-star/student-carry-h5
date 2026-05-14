@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
-import { ImagePlus, Send, X } from "lucide-react";
+import { Copy, ImagePlus, Send, X } from "lucide-react";
 import BackButton from "../components/BackButton";
 import {
   appendConversationMessage,
@@ -17,7 +17,7 @@ import {
 } from "../lib/conversations";
 import { readImageAsDataUrl } from "../lib/imageFiles";
 import { useLanguage } from "../lib/language";
-import { isMatchedStatus, localizedStatusLabel } from "../lib/orderAccess";
+import { isMatchedStatus } from "../lib/orderAccess";
 import { currentOwnerId, isLoggedIn } from "../lib/profile";
 import { updateSubmission } from "../lib/submissions";
 
@@ -37,7 +37,7 @@ function mergeMessages(current: ConversationMessage[], incoming: ConversationMes
 
 export default function ChatDetailPage() {
   const { conversationId } = useParams();
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
@@ -166,10 +166,10 @@ export default function ChatDetailPage() {
     conversation.postOwnerId === sideId ||
     conversation.starterUserId === sideId;
   const hasConfirmed = conversation.matchConfirmations?.includes(sideId);
-  const actionLabel =
-    conversation.postType === "request"
-      ? t("Accept Request", "接单")
-      : t("Confirm Match", "同意合作");
+  const otherConfirmed = Boolean(conversation.matchConfirmations?.some((id) => id !== sideId));
+  const matchStatus = isMatched ? "MATCHED" : conversation.matchConfirmations?.length ? "PENDING" : "OPEN";
+  const actionLabel = otherConfirmed ? t("Accept Match", "Accept Match") : t("Request Match", "Request Match");
+  const otherContact = sideId === conversation.postOwnerId ? conversation.starterContact : conversation.postOwnerContact;
 
   if (!canViewConversation) {
     return <Navigate to="/messages" replace />;
@@ -218,36 +218,55 @@ export default function ChatDetailPage() {
   return (
     <section className="mx-auto flex min-h-[calc(100vh-132px)] max-w-3xl flex-col px-4 py-4 sm:px-6 sm:py-6">
       <BackButton fallback="/messages" />
-      <div className="sticky top-0 z-10 rounded-[22px] border border-sky-300/20 bg-[#1f2232]/95 p-2.5 shadow-xl backdrop-blur">
+      <div className={`sticky top-0 z-10 rounded-[22px] border border-sky-300/20 bg-[#1f2232]/95 p-2.5 shadow-xl backdrop-blur ${isMatched ? "opacity-80" : ""}`}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-bold text-slate-400">{t("Transaction", "交易")}</p>
+            <p className="text-xs font-bold text-slate-400">Match Info</p>
             <p className="mt-0.5 text-xs font-semibold text-slate-300">{conversation.route}</p>
           </div>
           <span className="rounded-full bg-sky-400/15 px-2 py-0.5 text-[0.68rem] font-black text-sky-100">
-            {localizedStatusLabel(conversation.status, language)}
+            {matchStatus}
           </span>
         </div>
-        <div className="mt-2 grid grid-cols-2 gap-1.5 text-[0.68rem] text-slate-300 sm:grid-cols-4">
-          <span className="rounded-xl bg-white/[0.06] px-2 py-1">{t("Item", "物品")}: {conversation.item}</span>
+        <div className="mt-2 grid grid-cols-2 gap-1.5 text-[0.68rem] text-slate-300 sm:grid-cols-3">
+          <span className="rounded-xl bg-white/[0.06] px-2 py-1">{t("Item info / weight", "物品信息 / 重量")}: {conversation.item}</span>
           <span className="rounded-xl bg-white/[0.06] px-2 py-1">{t("Reward", "报酬")}: {conversation.reward}</span>
-          <span className="rounded-xl bg-white/[0.06] px-2 py-1">{t("Location", "地点")}: TBD</span>
-          <span className="rounded-xl bg-white/[0.06] px-2 py-1">{t("Time", "时间")}: TBD</span>
+          <span className="rounded-xl bg-white/[0.06] px-2 py-1">{t("Status", "状态")}: {matchStatus}</span>
         </div>
-        <button
-          type="button"
-          disabled={isMatched || hasConfirmed}
-          onClick={async () => {
-            const result = await confirmConversationMatch(conversation.id, sideId);
-            setConversation(result.conversation);
-            if (result.matched) {
-              void updateSubmission(conversation.postId, { status: "Matched" });
-            }
-          }}
-          className="pressable mt-2 w-full rounded-lg bg-[#38bdf8] px-3 py-1.5 text-xs font-black text-white disabled:bg-white/10 disabled:text-slate-400"
-        >
-          {isMatched ? t("Matched", "已匹配") : hasConfirmed ? t("Waiting for the other side", "等待对方确认") : actionLabel}
-        </button>
+        {!isMatched ? (
+          <>
+            {otherConfirmed && !hasConfirmed ? (
+              <p className="mt-2 rounded-xl bg-white/[0.06] px-3 py-2 text-xs font-semibold text-slate-200">
+                {t("The other user wants to match with you.", "对方希望与你匹配")}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              disabled={hasConfirmed}
+              onClick={async () => {
+                const result = await confirmConversationMatch(conversation.id, sideId);
+                setConversation(result.conversation);
+                if (result.matched) {
+                  void updateSubmission(conversation.postId, { status: "Matched" });
+                }
+              }}
+              className="pressable mt-2 w-full rounded-lg bg-[#38bdf8] px-3 py-1.5 text-xs font-black text-white disabled:bg-white/10 disabled:text-slate-400"
+            >
+              {hasConfirmed ? t("Waiting for confirmation", "Waiting for confirmation") : actionLabel}
+            </button>
+            <p className="mt-1 text-center text-[0.68rem] font-semibold text-slate-400">
+              {t("Contact details will be exchanged after acceptance.", "同意后将自动交换联系方式")}
+            </p>
+          </>
+        ) : (
+          <div className="mt-2 rounded-xl bg-white/[0.06] px-3 py-2 text-xs text-slate-200">
+            <p className="font-black text-sky-100">✓ {t("Contact details exchanged", "联系方式已交换")}</p>
+            <div className="mt-2 grid gap-1.5">
+              <ContactLine label="WeChat" value={otherContact?.shareWechat ? otherContact.wechatId : ""} empty={t("Not shared", "未共享")} />
+              <ContactLine label={t("Phone", "手机号")} value={otherContact?.sharePhone ? otherContact.phoneNumber : ""} empty={t("Not shared", "未共享")} />
+            </div>
+          </div>
+        )}
         {isMatched || hasConfirmed ? (
           <button
             type="button"
@@ -308,9 +327,6 @@ export default function ChatDetailPage() {
                     : "border border-white/10 bg-[#1f2232]/95 text-slate-100"
                 }`}
               >
-                <p className="text-xs font-black opacity-75">
-                  {message.author === "Me" ? t("Me", "我") : message.author}
-                </p>
                 {message.text ? <p className="mt-1">{message.text}</p> : null}
                 {message.imageDataUrl ? (
                   <img
@@ -404,5 +420,26 @@ export default function ChatDetailPage() {
         </div>
       </form>
     </section>
+  );
+}
+
+function ContactLine({ label, value, empty }: { label: string; value?: string; empty: string }) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.05] px-2 py-1.5">
+      <span className="font-semibold text-slate-400">{label}</span>
+      <span className="flex min-w-0 items-center gap-1 font-black text-white">
+        <span className="truncate">{value || empty}</span>
+        {value ? (
+          <button
+            type="button"
+            onClick={() => void navigator.clipboard?.writeText(value)}
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-sky-400/15 text-sky-100"
+            aria-label={`Copy ${label}`}
+          >
+            <Copy size={12} />
+          </button>
+        ) : null}
+      </span>
+    </div>
   );
 }

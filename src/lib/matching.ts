@@ -34,6 +34,10 @@ function normalize(value: string) {
   return value.toLowerCase().replace(/\s/g, "").replace(/'/g, "");
 }
 
+function sameValue(a?: string, b?: string) {
+  return Boolean(a && b && normalize(a) === normalize(b));
+}
+
 function splitRoute(route: string) {
   const [from = "", to = ""] = route.split(/→|->|至|到|-/).map((part) => part.trim());
   return { from, to };
@@ -67,15 +71,27 @@ export function reputationFor(index = 0) {
 }
 
 export function scoreCarrierForRequest(request: Partial<RequestSubmission>, carrier: CarrierSubmission) {
-  const requestFrom = normalize(request.fromLocation || "");
-  const requestTo = normalize(request.toLocation || "");
-  const carrierRoute = normalize(carrier.travelRoute || "");
-  const carrierParts = splitRoute(carrier.travelRoute || "");
+  if (
+    request.fromCountry &&
+    carrier.fromCountry &&
+    !sameValue(request.fromCountry, carrier.fromCountry)
+  ) {
+    return 0;
+  }
+  if (
+    request.toCountry &&
+    carrier.toCountry &&
+    !sameValue(request.toCountry, carrier.toCountry)
+  ) {
+    return 0;
+  }
+
   let score = 0;
 
-  if (carrierRoute.includes(requestFrom) && carrierRoute.includes(requestTo)) score += 50;
-  if (requestTo && normalize(carrierParts.to).includes(requestTo)) score += 28;
-  if (requestFrom && normalize(carrierParts.from).includes(requestFrom)) score += 16;
+  if (sameValue(request.fromCountry, carrier.fromCountry) && sameValue(request.toCountry, carrier.toCountry)) score += 60;
+  if (sameValue(request.fromLocation, carrier.fromLocation) && sameValue(request.toLocation, carrier.toLocation)) score += 25;
+  else if (sameValue(request.toLocation, carrier.toLocation)) score += 14;
+  else if (sameValue(request.fromLocation, carrier.fromLocation)) score += 8;
   if (dayDistance(request.desiredDeliveryDate, carrier.travelDate) <= 7) score += 12;
   if (
     request.itemCategory &&
@@ -88,15 +104,27 @@ export function scoreCarrierForRequest(request: Partial<RequestSubmission>, carr
 }
 
 export function scoreRequestForCarrier(carrier: Partial<CarrierSubmission>, request: RequestSubmission) {
-  const carrierParts = splitRoute(carrier.travelRoute || "");
-  const carrierRoute = normalize(carrier.travelRoute || "");
-  const requestFrom = normalize(request.fromLocation || "");
-  const requestTo = normalize(request.toLocation || "");
+  if (
+    carrier.fromCountry &&
+    request.fromCountry &&
+    !sameValue(carrier.fromCountry, request.fromCountry)
+  ) {
+    return 0;
+  }
+  if (
+    carrier.toCountry &&
+    request.toCountry &&
+    !sameValue(carrier.toCountry, request.toCountry)
+  ) {
+    return 0;
+  }
+
   let score = 0;
 
-  if (carrierRoute.includes(requestFrom) && carrierRoute.includes(requestTo)) score += 50;
-  if (requestTo && normalize(carrierParts.to).includes(requestTo)) score += 28;
-  if (requestFrom && normalize(carrierParts.from).includes(requestFrom)) score += 16;
+  if (sameValue(carrier.fromCountry, request.fromCountry) && sameValue(carrier.toCountry, request.toCountry)) score += 60;
+  if (sameValue(carrier.fromLocation, request.fromLocation) && sameValue(carrier.toLocation, request.toLocation)) score += 25;
+  else if (sameValue(carrier.toLocation, request.toLocation)) score += 14;
+  else if (sameValue(carrier.fromLocation, request.fromLocation)) score += 8;
   if (dayDistance(carrier.travelDate, request.desiredDeliveryDate) <= 7) score += 12;
   if (carrier.acceptedItemTypes?.some((item) => item === request.itemCategory)) score += 10;
 
@@ -111,7 +139,7 @@ export function matchingCarriers(request: Partial<RequestSubmission>, submission
       score: scoreCarrierForRequest(request, carrier),
       reputation: reputationFor(index),
     }))
-    .filter((item) => item.score > 0)
+    .filter((item) => item.score >= 80)
     .sort((a, b) => b.score - a.score)
     .slice(0, 3);
 }
@@ -124,7 +152,7 @@ export function matchingRequests(carrier: Partial<CarrierSubmission>, submission
       score: scoreRequestForCarrier(carrier, request),
       reputation: reputationFor(index),
     }))
-    .filter((item) => item.score > 0)
+    .filter((item) => item.score >= 80)
     .sort((a, b) => b.score - a.score)
     .slice(0, 3);
 }

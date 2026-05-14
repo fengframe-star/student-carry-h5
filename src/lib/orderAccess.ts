@@ -7,18 +7,22 @@ export function isMatchedStatus(status?: SubmissionStatus | string) {
 }
 
 export function publicStatusLabel(status?: SubmissionStatus | string) {
+  if (status === "Pending") {
+    return "PENDING";
+  }
   if (isMatchedStatus(status)) {
-    return "Matched";
+    return "MATCHED";
   }
 
-  return "Open";
+  return "OPEN";
 }
 
 export function localizedStatusLabel(status: SubmissionStatus | string | undefined, _language: "en" | "zh" = "en") {
   const normalized = publicStatusLabel(status);
   const labels: Record<string, string> = {
-    Open: "Open",
-    Matched: "Matched",
+    OPEN: "OPEN",
+    PENDING: "PENDING",
+    MATCHED: "MATCHED",
   };
 
   return labels[normalized] || normalized;
