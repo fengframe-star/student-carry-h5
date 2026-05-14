@@ -59,8 +59,8 @@ export default function MessagesPage() {
       }).then((close) => {
         unsubscribeConversations = close;
       }).catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : String(error);
-        setSyncError(t("Unable to connect to conversation sync.", "无法连接对话同步。") + ` ${message}`);
+        console.error("Conversation sync setup failed.", error);
+        setSyncError(t("Message sync is temporarily delayed.", "消息同步暂时延迟。"));
       });
       void subscribeUnreadMessages({
         onUnread: (ids) => {
@@ -72,12 +72,11 @@ export default function MessagesPage() {
             })),
           );
         },
-        onError: (message) => setSyncError(message),
+        onError: () => setSyncError(""),
       }).then((close) => {
         unsubscribeUnread = close;
       }).catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : String(error);
-        setSyncError(t("Unable to connect to unread sync.", "无法连接未读同步。") + ` ${message}`);
+        console.error("Unread sync setup failed.", error);
       });
     }
 
@@ -93,9 +92,7 @@ export default function MessagesPage() {
       setConversations(visibleConversations(await getConversations()));
     } catch (error) {
       console.error("Message list sync failed.", error);
-      const message = error instanceof Error ? error.message : String(error);
-      setSyncError(t("Unable to load conversations from CloudBase.", "无法从 CloudBase 加载对话。") + ` ${message}`);
-      setConversations([]);
+      setSyncError(t("Message sync is temporarily delayed.", "消息同步暂时延迟。"));
     }
   }
 

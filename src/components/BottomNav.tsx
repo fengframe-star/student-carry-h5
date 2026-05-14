@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { subscribeUnreadMessages } from "../lib/conversations";
 import { useLanguage } from "../lib/language";
-import { isLoggedIn } from "../lib/profile";
+import { currentOwnerId, isLoggedIn } from "../lib/profile";
 
 const items = [
   { to: "/", label: "Home", icon: Home },
@@ -15,6 +15,7 @@ const items = [
 export default function BottomNav() {
   const { t } = useLanguage();
   const location = useLocation();
+  const ownerId = currentOwnerId();
   const [hasUnreadMessages, setHasUnreadMessages] = useState(false);
 
   useEffect(() => {
@@ -36,7 +37,7 @@ export default function BottomNav() {
     return () => {
       unsubscribe?.();
     };
-  }, [location.pathname]);
+  }, [ownerId]);
 
   if (
     location.pathname.startsWith("/market/request/") ||

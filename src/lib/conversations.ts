@@ -49,6 +49,7 @@ export type ConversationInput = Omit<
 const conversationsCollectionName = "conversations";
 const messagesCollectionName = "messages";
 const cloudTimeoutMs = 3500;
+const syncFallbackPollingMs = 12_000;
 export const currentUserId = "me";
 
 let conversationCache: Conversation[] = [];
@@ -74,6 +75,38 @@ async function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
       window.clearTimeout(timeoutId);
     }
   }
+}
+
+function closeRealtimeListener(listener: { close?: () => void } | undefined) {
+  try {
+    listener?.close?.();
+  } catch (error) {
+    console.error("CloudBase listener close failed.", error);
+  }
+}
+
+function startPollingFallback(task: () => Promise<void>, label: string) {
+  let closed = false;
+
+  async function run() {
+    try {
+      await task();
+    } catch (error) {
+      console.error(`${label} polling failed.`, error);
+    }
+  }
+
+  void run();
+  const intervalId = window.setInterval(() => {
+    if (!closed) {
+      void run();
+    }
+  }, syncFallbackPollingMs);
+
+  return () => {
+    closed = true;
+    window.clearInterval(intervalId);
+  };
 }
 
 function stripUndefined<T>(value: T): T {
@@ -477,7 +510,20 @@ export async function subscribeConversationMessages(
 ) {
   await ensureCloudbaseLogin();
 
-  const listener = cloudbaseDb
+  let fallbackClose: (() => void) | undefined;
+  let listener: { close?: () => void } | undefined;
+
+  const startFallback = () => {
+    if (fallbackClose) return;
+    closeRealtimeListener(listener);
+    handlers.onError("Message sync is temporarily delayed.");
+    fallbackClose = startPollingFallback(async () => {
+      handlers.onMessages(await readMessages(conversationId));
+    }, "Message sync");
+  };
+
+  try {
+    listener = cloudbaseDb
     .collection(messagesCollectionName)
     .where({ conversationId })
     .orderBy("createdAt", "asc")
@@ -489,13 +535,19 @@ export async function subscribeConversationMessages(
         handlers.onMessages(messages);
       },
       onError: (error: unknown) => {
-        const message = error instanceof Error ? error.message : String(error);
         console.error("CloudBase message listener failed.", error);
-        handlers.onError(`Message sync failed: ${message}`);
+        startFallback();
       },
     });
+  } catch (error) {
+    console.error("CloudBase message listener setup failed.", error);
+    startFallback();
+  }
 
-  return () => listener.close();
+  return () => {
+    closeRealtimeListener(listener);
+    fallbackClose?.();
+  };
 }
 
 export async function subscribeConversations(
@@ -506,37 +558,58 @@ export async function subscribeConversations(
 ) {
   await ensureCloudbaseLogin();
 
-  const listener = cloudbaseDb
+  let fallbackClose: (() => void) | undefined;
+  let listener: { close?: () => void } | undefined;
+
+  const hydrateConversations = async (docs: Record<string, unknown>[]) => {
+    const conversations = await Promise.all(
+      docs.map(async (data) =>
+        normalizeConversation(data, await readMessages(String(data._id || data.id || ""))),
+      ),
+    );
+    const viewerId = currentOwnerId();
+    const visibleConversations = conversations
+      .filter((conversation) => conversation.hasMessages)
+      .filter((conversation) => conversation.participantIds?.includes(viewerId))
+      .sort((first, second) => (second.lastMessageAt || 0) - (first.lastMessageAt || 0));
+    conversationCache = visibleConversations;
+    handlers.onConversations(visibleConversations);
+  };
+
+  const startFallback = () => {
+    if (fallbackClose) return;
+    closeRealtimeListener(listener);
+    handlers.onError?.("Message sync is temporarily delayed.");
+    fallbackClose = startPollingFallback(async () => {
+      handlers.onConversations(await getConversations());
+    }, "Conversation sync");
+  };
+
+  try {
+    listener = cloudbaseDb
     .collection(conversationsCollectionName)
     .orderBy("updatedAt", "desc")
     .watch({
       onChange: (snapshot: { docs?: Record<string, unknown>[] }) => {
-        void Promise.all(
-          (snapshot.docs || []).map(async (data) =>
-            normalizeConversation(data, await readMessages(String(data._id || data.id || ""))),
-          ),
-        ).then((conversations) => {
-          const viewerId = currentOwnerId();
-          const visibleConversations = conversations
-            .filter((conversation) => conversation.hasMessages)
-            .filter((conversation) => conversation.participantIds?.includes(viewerId))
-            .sort((first, second) => (second.lastMessageAt || 0) - (first.lastMessageAt || 0));
-          conversationCache = visibleConversations;
-          handlers.onConversations(visibleConversations);
-        }).catch((error: unknown) => {
-          const message = error instanceof Error ? error.message : String(error);
+        void hydrateConversations(snapshot.docs || []).catch((error: unknown) => {
           console.error("CloudBase conversation listener hydration failed.", error);
-          handlers.onError?.(`Conversation sync failed: ${message}`);
+          startFallback();
         });
       },
       onError: (error: unknown) => {
-        const message = error instanceof Error ? error.message : String(error);
         console.error("CloudBase conversation listener failed.", error);
-        handlers.onError?.(`Conversation sync failed: ${message}`);
+        startFallback();
       },
     });
+  } catch (error) {
+    console.error("CloudBase conversation listener setup failed.", error);
+    startFallback();
+  }
 
-  return () => listener.close();
+  return () => {
+    closeRealtimeListener(listener);
+    fallbackClose?.();
+  };
 }
 
 export async function subscribeUnreadMessages(
@@ -552,7 +625,41 @@ export async function subscribeUnreadMessages(
     return () => {};
   }
 
-  const listener = cloudbaseDb
+  const loadUnread = async () => {
+    const result = await withTimeout(
+      cloudbaseDb
+        .collection(messagesCollectionName)
+        .where({ receiverId: viewerId })
+        .get(),
+      "Read unread messages",
+    );
+    const unreadConversationIds = new Set<string>();
+    (result.data || []).forEach((doc: Record<string, unknown>, index: number) => {
+      const message = normalizeMessage(doc, index);
+      const conversationId = typeof doc.conversationId === "string" ? doc.conversationId : "";
+      if (
+        conversationId &&
+        !message.recalled &&
+        !message.hiddenForUserIds?.includes(viewerId) &&
+        !message.readByUserIds?.includes(viewerId)
+      ) {
+        unreadConversationIds.add(conversationId);
+      }
+    });
+    handlers.onUnread(Array.from(unreadConversationIds));
+  };
+
+  let fallbackClose: (() => void) | undefined;
+  let listener: { close?: () => void } | undefined;
+
+  const startFallback = () => {
+    if (fallbackClose) return;
+    closeRealtimeListener(listener);
+    fallbackClose = startPollingFallback(loadUnread, "Unread sync");
+  };
+
+  try {
+    listener = cloudbaseDb
     .collection(messagesCollectionName)
     .where({ receiverId: viewerId })
     .watch({
@@ -573,13 +680,19 @@ export async function subscribeUnreadMessages(
         handlers.onUnread(Array.from(unreadConversationIds));
       },
       onError: (error: unknown) => {
-        const message = error instanceof Error ? error.message : String(error);
         console.error("CloudBase unread listener failed.", error);
-        handlers.onError?.(`Unread sync failed: ${message}`);
+        startFallback();
       },
     });
+  } catch (error) {
+    console.error("CloudBase unread listener setup failed.", error);
+    startFallback();
+  }
 
-  return () => listener.close();
+  return () => {
+    closeRealtimeListener(listener);
+    fallbackClose?.();
+  };
 }
 
 export function appendConversationImageMessage(id: string, imageDataUrl: string) {

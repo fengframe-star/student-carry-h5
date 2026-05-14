@@ -88,12 +88,11 @@ export default function ChatDetailPage() {
               void markConversationRead(id);
             }
           },
-          onError: setSyncError,
+          onError: (message) => setSyncError(message),
         });
       } catch (error) {
         console.error("Chat sync setup failed.", error);
-        const message = error instanceof Error ? error.message : String(error);
-        setSyncError(t("Unable to connect to message sync. Please check CloudBase permissions.", "无法连接消息同步，请检查 CloudBase 权限。") + ` ${message}`);
+        setSyncError(t("Message sync is temporarily delayed.", "消息同步暂时延迟。"));
       } finally {
         if (!cancelled) {
           setLoading(false);
