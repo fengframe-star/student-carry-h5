@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { Globe2, Moon, Sun } from "lucide-react";
 import logoUrl from "../assets/student-carry-logo.png";
@@ -12,24 +12,38 @@ const navItems = [
   { to: "/my", label: "My" },
 ];
 
+const LANGUAGE_ANIMATION_MS = 280;
+
 export default function Header() {
   const { language, setLanguage, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
+  const languagePickerRef = useRef<HTMLDivElement | null>(null);
   const [languageOpen, setLanguageOpen] = useState(false);
   const [languageClosing, setLanguageClosing] = useState(false);
 
   function closeLanguagePicker(nextLanguage?: "en" | "zh") {
+    if (!languageOpen || languageClosing) return;
     if (nextLanguage) {
       setLanguage(nextLanguage);
     }
     setLanguageClosing(true);
     window.setTimeout(() => {
-      setLanguageOpen(false);
-    }, 220);
-    window.setTimeout(() => {
       setLanguageClosing(false);
-    }, 440);
+      setLanguageOpen(false);
+    }, LANGUAGE_ANIMATION_MS);
   }
+
+  useEffect(() => {
+    if (!languageOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (languagePickerRef.current?.contains(event.target as Node)) return;
+      closeLanguagePicker();
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [languageOpen, languageClosing]);
 
   return (
     <header className="app-header sticky top-0 z-20 border-b border-white/10 bg-[#050918]/85 backdrop-blur">
@@ -40,7 +54,10 @@ export default function Header() {
           </span>
           <span>Student Carry</span>
         </Link>
-        <div className="language-picker relative ml-auto h-10 w-10 shrink-0">
+        <div
+          ref={languagePickerRef}
+          className={`language-picker relative ml-auto h-10 shrink-0 ${languageOpen ? "language-picker-open" : ""} ${languageClosing ? "language-picker-closing" : ""}`}
+        >
           <button
             type="button"
             onClick={() => {
@@ -50,7 +67,7 @@ export default function Header() {
                 setLanguageOpen(true);
               }
             }}
-            className={`pressable language-globe absolute right-0 top-0 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 ${languageOpen ? "language-globe-open" : ""}`}
+            className={`pressable language-globe absolute right-0 top-0 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 ${languageOpen ? "language-globe-open" : ""} ${languageClosing ? "language-globe-closing" : ""}`}
             aria-label="Change language"
           >
             <Globe2 size={20} strokeWidth={1.8} />
