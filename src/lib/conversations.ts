@@ -149,7 +149,7 @@ function timeLabel(createdAt?: number) {
   return `${Math.round(hours / 24)}d ago`;
 }
 
-function normalizeMessage(message: Record<string, unknown>, index: number): ConversationMessage {
+function normalizeMessage(message: Record<string, unknown>, index: number, viewerId = currentOwnerId()): ConversationMessage {
   const senderId = String(message.senderId || (message.author === "Me" ? currentUserId : "other-user"));
   const imageUrl = typeof message.imageUrl === "string"
     ? message.imageUrl
@@ -159,7 +159,7 @@ function normalizeMessage(message: Record<string, unknown>, index: number): Conv
 
   return {
     id: String(message._id || message.id || `legacy-${index}`),
-    author: senderId === currentOwnerId() || senderId === currentUserId ? "Me" : "Post owner",
+    author: senderId === viewerId || senderId === currentUserId ? "Me" : "Post owner",
     senderId,
     receiverId: typeof message.receiverId === "string" ? message.receiverId : undefined,
     text: typeof message.text === "string" ? message.text : undefined,
@@ -178,10 +178,9 @@ function normalizeMessage(message: Record<string, unknown>, index: number): Conv
   };
 }
 
-function normalizeConversation(data: Record<string, unknown>, messages: ConversationMessage[] = []): Conversation {
+function normalizeConversation(data: Record<string, unknown>, messages: ConversationMessage[] = [], viewerId = currentOwnerId()): Conversation {
   const createdAt = typeof data.createdAt === "number" ? data.createdAt : undefined;
   const lastMessageAt = typeof data.lastMessageAt === "number" ? data.lastMessageAt : undefined;
-  const viewerId = currentOwnerId();
   const participantIds = Array.isArray(data.participantIds)
     ? (data.participantIds as string[]).filter(Boolean)
     : [data.postOwnerId, data.starterUserId].filter(Boolean) as string[];
@@ -193,7 +192,7 @@ function normalizeConversation(data: Record<string, unknown>, messages: Conversa
       !message.readByUserIds?.includes(viewerId),
   );
   const postOwnerId = typeof data.postOwnerId === "string" ? data.postOwnerId : undefined;
-  const starterUserId = typeof data.starterUserId === "string" ? data.starterUserId : currentOwnerId();
+  const starterUserId = typeof data.starterUserId === "string" ? data.starterUserId : viewerId;
   const postOwnerName = String(data.postOwnerName || data.otherUserName || "");
   const starterUserName = String(data.starterUserName || "");
   const otherUserName = viewerId && viewerId === postOwnerId
@@ -270,7 +269,7 @@ async function readUserContact(ownerId?: string): Promise<ContactInfo> {
   }
 }
 
-async function readMessages(conversationId: string) {
+async function readMessages(conversationId: string, viewerId = currentOwnerId()) {
   const result = await withTimeout(
     cloudbaseDb
       .collection(messagesCollectionName)
@@ -281,7 +280,7 @@ async function readMessages(conversationId: string) {
   );
 
   return (result.data || [])
-    .map(normalizeMessage)
+    .map((data, index) => normalizeMessage(data, index, viewerId))
     .sort((first, second) => (first.createdAt || 0) - (second.createdAt || 0));
 }
 
@@ -310,7 +309,7 @@ export async function getConversations() {
 
     const conversations = await Promise.all(
       (result.data || []).map(async (data: Record<string, unknown>) =>
-        normalizeConversation(data, await readMessages(String(data._id || data.id || ""))),
+        normalizeConversation(data, await readMessages(String(data._id || data.id || ""), viewerId), viewerId),
       ),
     );
     const visibleConversations = conversations
@@ -329,13 +328,13 @@ export async function getConversation(id: string) {
   const cached = conversationCache.find((conversation) => conversation.id === id);
 
   try {
-    await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
+    const viewerId = await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
     const data = await withTimeout(readConversationDocument(id), "Read conversation");
     if (!data) {
       return cached ?? null;
     }
 
-    const conversation = normalizeConversation(data, await readMessages(id));
+    const conversation = normalizeConversation(data, await readMessages(id, viewerId), viewerId);
     conversationCache = [
       conversation,
       ...conversationCache.filter((cached) => cached.id !== conversation.id),
@@ -424,7 +423,7 @@ export async function markConversationRead(id: string) {
   let viewerId = "";
   try {
     viewerId = await withTimeout(ensureCloudbaseLogin(), "CloudBase login");
-    const messages = await readMessages(id);
+    const messages = await readMessages(id, viewerId);
     await Promise.all(
       messages
         .filter(
@@ -505,7 +504,6 @@ export async function appendConversationMessage(id: string, text?: string, image
     recalled: false,
     hiddenForUserIds: [],
   };
-  const latestPreview = text || (imageDataUrl ? "Sent an image" : "");
 
   await withTimeout(
     cloudbaseDb.collection(messagesCollectionName).doc(stableMessageId).set(
@@ -557,7 +555,7 @@ export async function subscribeConversationMessages(
     onError: (message: string) => void;
   },
 ) {
-  await ensureCloudbaseLogin();
+  const viewerId = await ensureCloudbaseLogin();
 
   let fallbackClose: (() => void) | undefined;
   let listener: { close?: () => void } | undefined;
@@ -567,7 +565,7 @@ export async function subscribeConversationMessages(
     closeRealtimeListener(listener);
     handlers.onError("Message sync is temporarily delayed.");
     fallbackClose = startPollingFallback(async () => {
-      handlers.onMessages(await readMessages(conversationId));
+      handlers.onMessages(await readMessages(conversationId, viewerId));
     }, "Message sync");
   };
 
@@ -579,7 +577,7 @@ export async function subscribeConversationMessages(
     .watch({
       onChange: (snapshot: { docs?: Record<string, unknown>[] }) => {
         const messages = (snapshot.docs || [])
-          .map(normalizeMessage)
+          .map((data, index) => normalizeMessage(data, index, viewerId))
           .sort((first, second) => (first.createdAt || 0) - (second.createdAt || 0));
         handlers.onMessages(messages);
       },
@@ -606,7 +604,7 @@ export async function subscribeConversation(
     onError?: (message: string) => void;
   },
 ) {
-  await ensureCloudbaseLogin();
+  const viewerId = await ensureCloudbaseLogin();
 
   let fallbackClose: (() => void) | undefined;
   let listener: { close?: () => void } | undefined;
@@ -625,7 +623,7 @@ export async function subscribeConversation(
   try {
     listener = cloudbaseDb
       .collection(conversationsCollectionName)
-      .where({ _id: conversationId })
+      .where({ id: conversationId })
       .watch({
         onChange: () => {
           void loadConversation().catch((error) => {
@@ -663,7 +661,7 @@ export async function subscribeConversations(
   const hydrateConversations = async (docs: Record<string, unknown>[]) => {
     const conversations = await Promise.all(
       docs.map(async (data) =>
-        normalizeConversation(data, await readMessages(String(data._id || data.id || ""))),
+        normalizeConversation(data, await readMessages(String(data._id || data.id || ""), viewerId), viewerId),
       ),
     );
     const visibleConversations = conversations
@@ -732,7 +730,7 @@ export async function subscribeUnreadMessages(
     );
     const unreadConversationIds = new Set<string>();
     (result.data || []).forEach((doc: Record<string, unknown>, index: number) => {
-      const message = normalizeMessage(doc, index);
+      const message = normalizeMessage(doc, index, viewerId);
       const conversationId = typeof doc.conversationId === "string" ? doc.conversationId : "";
       if (
         conversationId &&
@@ -763,7 +761,7 @@ export async function subscribeUnreadMessages(
       onChange: (snapshot: { docs?: Record<string, unknown>[] }) => {
         const unreadConversationIds = new Set<string>();
         (snapshot.docs || []).forEach((doc, index) => {
-          const message = normalizeMessage(doc, index);
+          const message = normalizeMessage(doc, index, viewerId);
           const conversationId = typeof doc.conversationId === "string" ? doc.conversationId : "";
           if (
             conversationId &&

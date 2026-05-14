@@ -21,6 +21,7 @@ import { useLanguage } from "../lib/language";
 import { isMatchedStatus } from "../lib/orderAccess";
 import { currentOwnerId, isLoggedIn } from "../lib/profile";
 import { updateSubmission } from "../lib/submissions";
+import { getCloudbaseUid } from "../utils/cloudbase";
 
 function mergeMessages(current: ConversationMessage[], incoming: ConversationMessage[]) {
   if (incoming.length === 0 && current.length > 0) {
@@ -47,6 +48,8 @@ export default function ChatDetailPage() {
   const [sendError, setSendError] = useState("");
   const [activeActionMessageId, setActiveActionMessageId] = useState<string | null>(null);
   const [pressTimer, setPressTimer] = useState<number | null>(null);
+  const [sessionUid, setSessionUid] = useState(currentOwnerId());
+  const [matchActionPending, setMatchActionPending] = useState(false);
 
   useEffect(() => {
     if (!conversationId) {
@@ -68,6 +71,8 @@ export default function ChatDetailPage() {
       setSyncError("");
       try {
         await markConversationRead(id);
+        const viewerId = (await getCloudbaseUid()) || currentOwnerId();
+        setSessionUid(viewerId);
         const nextConversation = await getConversation(id);
         if (cancelled) {
           return;
@@ -93,8 +98,8 @@ export default function ChatDetailPage() {
             if (
               messages.some(
                 (message) =>
-                  message.senderId !== currentOwnerId() &&
-                  !message.readByUserIds?.includes(currentOwnerId()),
+                  message.senderId !== viewerId &&
+                  !message.readByUserIds?.includes(viewerId),
               )
             ) {
               void markConversationRead(id);
@@ -169,7 +174,7 @@ export default function ChatDetailPage() {
   }
 
   const isMatched = isMatchedStatus(conversation.status);
-  const sideId = currentOwnerId();
+  const sideId = sessionUid || currentOwnerId();
   const canViewConversation =
     !isMatched ||
     !conversation.postOwnerId ||
@@ -207,7 +212,7 @@ export default function ChatDetailPage() {
 
   function canRecall(message: ConversationMessage) {
     return (
-      (message.senderId === currentOwnerId() || message.senderId === currentUserId) &&
+      (message.senderId === sideId || message.senderId === currentUserId) &&
       !message.recalled &&
       Boolean(message.createdAt) &&
       Date.now() - (message.createdAt || 0) <= 120_000
@@ -253,12 +258,18 @@ export default function ChatDetailPage() {
             ) : null}
             <button
               type="button"
-              disabled={hasConfirmed}
+              disabled={hasConfirmed || matchActionPending}
               onClick={async () => {
-                const result = await confirmConversationMatch(conversation.id, sideId);
-                setConversation(result.conversation);
-                if (result.matched) {
-                  void updateSubmission(conversation.postId, { status: "Matched", matchedAt: Date.now() } as never);
+                if (matchActionPending) return;
+                setMatchActionPending(true);
+                try {
+                  const result = await confirmConversationMatch(conversation.id, sideId);
+                  setConversation(result.conversation);
+                  if (result.matched) {
+                    void updateSubmission(conversation.postId, { status: "Matched", matchedAt: Date.now() } as never);
+                  }
+                } finally {
+                  setMatchActionPending(false);
                 }
               }}
               className="pressable mt-2 w-full rounded-lg bg-[#38bdf8] px-3 py-1.5 text-xs font-black text-white disabled:bg-white/10 disabled:text-slate-400"
@@ -281,12 +292,19 @@ export default function ChatDetailPage() {
         {matchStatus === "PENDING" || matchStatus === "MATCHED" ? (
           <button
             type="button"
+            disabled={matchActionPending}
             onClick={async () => {
-              const next = await cancelConversationMatch(conversation.id);
-              setConversation(next);
-              void updateSubmission(conversation.postId, { status: "Open", matchedAt: null } as never);
+              if (matchActionPending) return;
+              setMatchActionPending(true);
+              try {
+                const next = await cancelConversationMatch(conversation.id);
+                setConversation(next);
+                void updateSubmission(conversation.postId, { status: "Open", matchedAt: null } as never);
+              } finally {
+                setMatchActionPending(false);
+              }
             }}
-            className="pressable mt-1.5 w-full rounded-lg border border-red-300/25 bg-red-500/10 px-3 py-1.5 text-xs font-black text-red-100"
+            className="pressable mt-1.5 w-full rounded-lg border border-red-300/25 bg-red-500/10 px-3 py-1.5 text-xs font-black text-red-100 disabled:opacity-50"
           >
             {t("Cancel Match", "取消匹配")}
           </button>

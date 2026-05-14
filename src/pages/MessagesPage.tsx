@@ -4,6 +4,7 @@ import { BadgeEuro, Clock3, MapPin } from "lucide-react";
 import { currentUserId, getConversations, hideConversationForMe, subscribeConversations, subscribeUnreadMessages, type Conversation } from "../lib/conversations";
 import { useLanguage } from "../lib/language";
 import { currentOwnerId, isLoggedIn } from "../lib/profile";
+import { getCloudbaseUid } from "../utils/cloudbase";
 
 const messageCards = [
   {
@@ -54,7 +55,12 @@ export default function MessagesPage() {
     if (isLoggedIn()) {
       void reloadConversations();
       void subscribeConversations({
-        onConversations: (nextConversations) => setConversations(visibleConversations(nextConversations)),
+        onConversations: (nextConversations) => {
+          void getCloudbaseUid().then((uid) => {
+            const viewerId = uid || currentOwnerId();
+            setConversations(visibleConversations(nextConversations, viewerId));
+          });
+        },
         onError: (message) => setSyncError(message),
       }).then((close) => {
         unsubscribeConversations = close;
@@ -89,7 +95,8 @@ export default function MessagesPage() {
   async function reloadConversations() {
     try {
       setSyncError("");
-      setConversations(visibleConversations(await getConversations()));
+      const uid = (await getCloudbaseUid()) || currentOwnerId();
+      setConversations(visibleConversations(await getConversations(), uid));
     } catch (error) {
       console.error("Message list sync failed.", error);
       setSyncError(t("Message sync is temporarily delayed.", "消息同步暂时延迟。"));
@@ -314,8 +321,7 @@ export default function MessagesPage() {
   );
 }
 
-function visibleConversations(conversations: Conversation[]): Conversation[] {
-  const ownerId = currentOwnerId();
+function visibleConversations(conversations: Conversation[], ownerId = currentOwnerId()): Conversation[] {
   return conversations.filter(
     (conversation) =>
       (conversation.participantIds?.includes(ownerId) || conversation.postOwnerId === ownerId || conversation.starterUserId === ownerId) &&

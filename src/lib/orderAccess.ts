@@ -3,7 +3,7 @@ import { currentOwnerId, profileNickname } from "./profile";
 import type { Submission, SubmissionStatus } from "../types";
 
 export function isMatchedStatus(status?: SubmissionStatus | string) {
-  return status === "Matched" || status === "Closed" || status === "Completed";
+  return status === "Matched";
 }
 
 export function publicStatusLabel(status?: SubmissionStatus | string) {
