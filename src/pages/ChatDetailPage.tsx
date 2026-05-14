@@ -11,6 +11,7 @@ import {
   hideConversationMessageForMe,
   markConversationRead,
   recallConversationMessage,
+  subscribeConversation,
   subscribeConversationMessages,
   type Conversation,
   type ConversationMessage,
@@ -58,7 +59,8 @@ export default function ChatDetailPage() {
     }
 
     const id = conversationId;
-    let unsubscribe: (() => void) | undefined;
+    let unsubscribeMessages: (() => void) | undefined;
+    let unsubscribeConversation: (() => void) | undefined;
     let cancelled = false;
 
     async function loadConversation() {
@@ -72,7 +74,17 @@ export default function ChatDetailPage() {
         }
 
         setConversation(nextConversation);
-        unsubscribe = await subscribeConversationMessages(id, {
+        unsubscribeConversation = await subscribeConversation(id, {
+          onConversation: (next) => {
+            if (!next) return;
+            setConversation((current) => ({
+              ...next,
+              messages: current?.messages?.length ? current.messages : next.messages,
+            }));
+          },
+          onError: (message) => setSyncError(message),
+        });
+        unsubscribeMessages = await subscribeConversationMessages(id, {
           onMessages: (messages) => {
             setConversation((current) => {
               if (!current) return current;
@@ -104,9 +116,8 @@ export default function ChatDetailPage() {
 
     return () => {
       cancelled = true;
-      if (unsubscribe) {
-        unsubscribe();
-      }
+      unsubscribeMessages?.();
+      unsubscribeConversation?.();
     };
   }, [conversationId, t]);
 
@@ -168,7 +179,7 @@ export default function ChatDetailPage() {
   const hasConfirmed = conversation.matchConfirmations?.includes(sideId);
   const otherConfirmed = Boolean(conversation.matchConfirmations?.some((id) => id !== sideId));
   const matchStatus = isMatched ? "MATCHED" : conversation.matchConfirmations?.length ? "PENDING" : "OPEN";
-  const actionLabel = otherConfirmed ? t("Accept Match", "Accept Match") : t("Request Match", "Request Match");
+  const actionLabel = otherConfirmed ? t("Accept Match", "接受匹配") : t("Request Match", "请求匹配");
   const otherContact = sideId === conversation.postOwnerId ? conversation.starterContact : conversation.postOwnerContact;
 
   if (!canViewConversation) {
@@ -247,12 +258,12 @@ export default function ChatDetailPage() {
                 const result = await confirmConversationMatch(conversation.id, sideId);
                 setConversation(result.conversation);
                 if (result.matched) {
-                  void updateSubmission(conversation.postId, { status: "Matched" });
+                  void updateSubmission(conversation.postId, { status: "Matched", matchedAt: Date.now() } as never);
                 }
               }}
               className="pressable mt-2 w-full rounded-lg bg-[#38bdf8] px-3 py-1.5 text-xs font-black text-white disabled:bg-white/10 disabled:text-slate-400"
             >
-              {hasConfirmed ? t("Waiting for confirmation", "Waiting for confirmation") : actionLabel}
+              {hasConfirmed ? t("Waiting for confirmation", "等待确认") : actionLabel}
             </button>
             <p className="mt-1 text-center text-[0.68rem] font-semibold text-slate-400">
               {t("Contact details will be exchanged after acceptance.", "同意后将自动交换联系方式")}
@@ -267,13 +278,13 @@ export default function ChatDetailPage() {
             </div>
           </div>
         )}
-        {isMatched || hasConfirmed ? (
+        {matchStatus === "PENDING" || matchStatus === "MATCHED" ? (
           <button
             type="button"
             onClick={async () => {
               const next = await cancelConversationMatch(conversation.id);
               setConversation(next);
-              void updateSubmission(conversation.postId, { status: "Open" });
+              void updateSubmission(conversation.postId, { status: "Open", matchedAt: null } as never);
             }}
             className="pressable mt-1.5 w-full rounded-lg border border-red-300/25 bg-red-500/10 px-3 py-1.5 text-xs font-black text-red-100"
           >

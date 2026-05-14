@@ -53,8 +53,8 @@ export default function MarketPage() {
     void load();
   }, []);
 
-  const marketSubmissions = submissions.filter((submission) => isOpenStatus(submission.status));
-  const allMarketSubmissions = submissions.filter((submission) => isOpenStatus(submission.status) || shouldKeepMatchedInMarket(submission));
+  const marketSubmissions = submissions.filter((submission) => isOpenStatus(submission.status) && shouldKeepOpenInMarket(submission));
+  const allMarketSubmissions = submissions.filter(shouldShowInMarket);
   const requests = marketSubmissions.filter(
     (submission): submission is RequestSubmission =>
       submission.type === "request" && isOpenStatus(submission.status),
@@ -203,13 +203,20 @@ function StatusBadge({ status }: { status?: string }) {
   );
 }
 
+function shouldShowInMarket(submission: Submission) {
+  return isOpenStatus(submission.status) ? shouldKeepOpenInMarket(submission) : shouldKeepMatchedInMarket(submission);
+}
+
+function shouldKeepOpenInMarket(submission: Submission) {
+  const dateValue = submission.type === "request" ? submission.desiredDeliveryDate : submission.travelDate;
+  if (!dateValue) return true;
+  const hideAfter = new Date(dateValue).getTime() + 48 * 60 * 60 * 1000;
+  return Number.isNaN(hideAfter) || Date.now() <= hideAfter;
+}
+
 function shouldKeepMatchedInMarket(submission: Submission) {
-  if (isOpenStatus(submission.status)) return true;
-  if (submission.type !== "request") return true;
-  if (!submission.desiredDeliveryDate) return true;
-  const hideAfter = new Date(submission.desiredDeliveryDate);
-  hideAfter.setDate(hideAfter.getDate() + 3);
-  return Date.now() <= hideAfter.getTime();
+  const base = submission.matchedAt || submission.updatedAt?.getTime?.() || Date.now();
+  return Date.now() <= base + 7 * 24 * 60 * 60 * 1000;
 }
 
 function RequestCard({ item, index }: { item: RequestSubmission; index: number }) {

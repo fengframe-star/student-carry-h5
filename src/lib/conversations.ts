@@ -34,8 +34,10 @@ export type Conversation = {
   matchConfirmations?: string[];
   postOwnerContact?: ContactInfo;
   starterContact?: ContactInfo;
+  matchedAt?: number;
   hasMessages?: boolean;
   lastMessageAt?: number;
+  updatedAt?: number;
   latestPreview: string;
   latestTime: string;
   unread: boolean;
@@ -178,7 +180,7 @@ function normalizeMessage(message: Record<string, unknown>, index: number): Conv
 
 function normalizeConversation(data: Record<string, unknown>, messages: ConversationMessage[] = []): Conversation {
   const createdAt = typeof data.createdAt === "number" ? data.createdAt : undefined;
-  const lastMessageAt = typeof data.lastMessageAt === "number" ? data.lastMessageAt : createdAt;
+  const lastMessageAt = typeof data.lastMessageAt === "number" ? data.lastMessageAt : undefined;
   const viewerId = currentOwnerId();
   const participantIds = Array.isArray(data.participantIds)
     ? (data.participantIds as string[]).filter(Boolean)
@@ -221,7 +223,7 @@ function normalizeConversation(data: Record<string, unknown>, messages: Conversa
     starterContact: typeof data.starterContact === "object" && data.starterContact
       ? data.starterContact as ContactInfo
       : undefined,
-    hasMessages: Boolean(data.hasMessages || lastMessageAt || messages.length),
+    hasMessages: Boolean(data.hasMessages || messages.length),
     lastMessageAt,
     latestPreview: latestPreviewFor(messages, viewerId) || String(data.latestPreview || ""),
     latestTime: String(data.latestTime || timeLabel(lastMessageAt)),
@@ -229,6 +231,8 @@ function normalizeConversation(data: Record<string, unknown>, messages: Conversa
     hiddenForUserIds: Array.isArray(data.hiddenForUserIds)
       ? (data.hiddenForUserIds as string[])
       : [],
+    matchedAt: typeof data.matchedAt === "number" ? data.matchedAt : undefined,
+    updatedAt: typeof data.updatedAt === "number" ? data.updatedAt : undefined,
     messages,
   };
 }
@@ -246,7 +250,7 @@ function latestPreviewFor(messages: ConversationMessage[], viewerId = currentOwn
     return "Message recalled";
   }
 
-  return latest.text || (latest.imageDataUrl ? "Sent an image" : "");
+  return latest.text || (latest.imageDataUrl || latest.imageUrl ? "[Image]" : "");
 }
 
 async function readUserContact(ownerId?: string): Promise<ContactInfo> {
@@ -310,9 +314,9 @@ export async function getConversations() {
       ),
     );
     const visibleConversations = conversations
-      .filter((conversation) => conversation.hasMessages)
+      .filter((conversation) => conversation.hasMessages || conversation.status === "Matched")
       .filter((conversation) => conversation.participantIds?.includes(viewerId))
-      .sort((first, second) => (second.lastMessageAt || 0) - (first.lastMessageAt || 0));
+      .sort((first, second) => (second.lastMessageAt || second.updatedAt || second.matchedAt || 0) - (first.lastMessageAt || first.updatedAt || first.matchedAt || 0));
     conversationCache = visibleConversations;
     return visibleConversations;
   } catch (error) {
@@ -439,10 +443,14 @@ export async function markConversationRead(id: string) {
             }),
         ),
     );
+    const conversationDocument = await readConversationDocument(id);
+    const unreadForUserIds = Array.isArray(conversationDocument?.unreadForUserIds)
+      ? (conversationDocument.unreadForUserIds as string[]).filter((userId) => userId !== viewerId)
+      : [];
     await withTimeout(
       cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
-        unread: false,
-        unreadForUserIds: [],
+        unread: unreadForUserIds.length > 0,
+        unreadForUserIds,
         updatedAt: timestamp(),
       }),
       "Mark conversation read",
@@ -520,7 +528,7 @@ export async function appendConversationMessage(id: string, text?: string, image
     cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
       participantIds: Array.from(new Set([conversation.postOwnerId, conversation.starterUserId, senderId, receiverId].filter(Boolean))),
       hasMessages: true,
-      latestPreview,
+      latestPreview: text || (imageDataUrl ? "[Image]" : ""),
       latestTime: timeLabel(createdAt),
       lastMessageAt: createdAt,
       unread: true,
@@ -591,6 +599,56 @@ export async function subscribeConversationMessages(
   };
 }
 
+export async function subscribeConversation(
+  conversationId: string,
+  handlers: {
+    onConversation: (conversation: Conversation | null) => void;
+    onError?: (message: string) => void;
+  },
+) {
+  await ensureCloudbaseLogin();
+
+  let fallbackClose: (() => void) | undefined;
+  let listener: { close?: () => void } | undefined;
+
+  const loadConversation = async () => {
+    handlers.onConversation(await getConversation(conversationId));
+  };
+
+  const startFallback = () => {
+    if (fallbackClose) return;
+    closeRealtimeListener(listener);
+    handlers.onError?.("Message sync is temporarily delayed.");
+    fallbackClose = startPollingFallback(loadConversation, "Conversation detail sync");
+  };
+
+  try {
+    listener = cloudbaseDb
+      .collection(conversationsCollectionName)
+      .where({ _id: conversationId })
+      .watch({
+        onChange: () => {
+          void loadConversation().catch((error) => {
+            console.error("CloudBase conversation detail hydration failed.", error);
+            startFallback();
+          });
+        },
+        onError: (error: unknown) => {
+          console.error("CloudBase conversation detail listener failed.", error);
+          startFallback();
+        },
+      });
+  } catch (error) {
+    console.error("CloudBase conversation detail listener setup failed.", error);
+    startFallback();
+  }
+
+  return () => {
+    closeRealtimeListener(listener);
+    fallbackClose?.();
+  };
+}
+
 export async function subscribeConversations(
   handlers: {
     onConversations: (conversations: Conversation[]) => void;
@@ -609,9 +667,9 @@ export async function subscribeConversations(
       ),
     );
     const visibleConversations = conversations
-      .filter((conversation) => conversation.hasMessages)
+      .filter((conversation) => conversation.hasMessages || conversation.status === "Matched")
       .filter((conversation) => conversation.participantIds?.includes(viewerId))
-      .sort((first, second) => (second.lastMessageAt || 0) - (first.lastMessageAt || 0));
+      .sort((first, second) => (second.lastMessageAt || second.updatedAt || second.matchedAt || 0) - (first.lastMessageAt || first.updatedAt || first.matchedAt || 0));
     conversationCache = visibleConversations;
     handlers.onConversations(visibleConversations);
   };
@@ -838,6 +896,7 @@ export async function confirmConversationMatch(id: string, confirmerId?: string)
     matchConfirmations: confirmations,
     postOwnerContact,
     starterContact,
+    matchedAt: matched ? timestamp() : undefined,
     updatedAt: timestamp(),
   }));
   const updated = await getConversation(id);
@@ -853,6 +912,7 @@ export async function cancelConversationMatch(id: string) {
   await cloudbaseDb.collection(conversationsCollectionName).doc(id).update({
     status: "Open",
     matchConfirmations: [],
+    matchedAt: null,
     updatedAt: timestamp(),
   });
   return getConversation(id);

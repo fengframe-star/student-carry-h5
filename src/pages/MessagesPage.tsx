@@ -275,7 +275,7 @@ export default function MessagesPage() {
                     <p className="mt-0.5 truncate text-xs font-semibold text-slate-300">
                       {conversation.item} · {conversation.route}
                     </p>
-                    <p className="mt-0.5 truncate text-[0.68rem] text-slate-500">{conversation.latestPreview}</p>
+                    <p className="mt-0.5 truncate text-[0.68rem] text-slate-500">{messagePreview(conversation.latestPreview, t)}</p>
                   </div>
                   <span className="shrink-0 rounded-full bg-sky-400/15 px-2 py-0.5 text-[0.68rem] font-black text-sky-100">
                     {conversation.reward}
@@ -319,7 +319,15 @@ function visibleConversations(conversations: Conversation[]): Conversation[] {
   return conversations.filter(
     (conversation) =>
       (conversation.participantIds?.includes(ownerId) || conversation.postOwnerId === ownerId || conversation.starterUserId === ownerId) &&
+      (conversation.hasMessages || conversation.status === "Matched") &&
       !conversation.hiddenForUserIds?.includes(ownerId) &&
       !conversation.hiddenForUserIds?.includes(currentUserId),
   );
+}
+
+function messagePreview(preview: string, t: (en: string, zh: string) => string) {
+  if (preview === "[Image]" || preview === "Sent an image") {
+    return t("[Image]", "[图片]");
+  }
+  return preview;
 }

@@ -61,6 +61,8 @@ function normalizeSubmission(data: Record<string, unknown>): Submission {
     id: String(data._id || data.id || ""),
     status: data.status === "Matched" ? "Matched" : "Open",
     createdAt: dateFrom(data.createdAt),
+    updatedAt: dateFrom(data.updatedAt),
+    matchedAt: typeof data.matchedAt === "number" ? data.matchedAt : undefined,
   } as Submission;
 }
 
@@ -76,7 +78,7 @@ async function getPost(id: string) {
 
 function isStatusOnlyUpdate(data: Partial<Submission>) {
   const keys = Object.keys(data);
-  return keys.length > 0 && keys.every((key) => key === "status");
+  return keys.length > 0 && keys.every((key) => key === "status" || key === "matchedAt");
 }
 
 export async function createRequestSubmission(data: RequestInput) {

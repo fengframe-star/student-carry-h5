@@ -47,6 +47,8 @@ export interface RequestSubmission {
   status: SubmissionStatus;
   publishedDate: string;
   createdAt?: Date;
+  updatedAt?: Date;
+  matchedAt?: number;
 }
 
 export interface CarrierSubmission {
@@ -71,6 +73,8 @@ export interface CarrierSubmission {
   status: SubmissionStatus;
   publishedDate: string;
   createdAt?: Date;
+  updatedAt?: Date;
+  matchedAt?: number;
 }
 
 export type Submission = RequestSubmission | CarrierSubmission;
